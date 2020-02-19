@@ -31,3 +31,11 @@ assert_eq!(slice, &[10; 5]);
 slice[2] = 100;
 assert_eq!(slice, &[10, 10, 100, 10, 10]);
 ```
+
+## Copying
+
+Copyright (c) 2020 autumnontape
+
+This project may be reproduced under the terms of the MIT or
+the Apache 2.0 license, at your option. A copy of each license
+is included.
