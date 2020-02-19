@@ -1,11 +1,13 @@
 [package]
 name = "bump-into"
 version = "0.1.0"
+edition = "2018"
+authors = ["Autumn <autumnontape@tutanota.com>"]
 description = "a no_std bump allocator over an arbitrary region of memory"
+license = "MIT OR Apache-2.0"
 repository = "https://github.com/autumnontape/bump-into"
 categories = ["no-std", "rust-patterns", "memory-management"]
-authors = ["Autumn <autumnontape@tutanota.com>"]
-license = "MIT OR Apache-2.0"
-edition = "2018"
+readme = "README.md"
+documentation = "https://docs.rs/bump-into"
 
 [dependencies]
