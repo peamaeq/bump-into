@@ -9,6 +9,7 @@ use core::ptr;
 pub use size_align::{AlignOf, SizeOf};
 
 /// A bump allocator over an arbitrary region of memory.
+#[derive(Debug)]
 pub struct BumpInto<'a> {
     array: UnsafeCell<&'a mut [MaybeUninit<u8>]>,
 }
