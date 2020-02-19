@@ -1,7 +1,7 @@
 use core::marker::PhantomData;
 use core::mem;
 
-/// A zero-sized struct that becomes `core::mem::align_of::<T>::()`
+/// A zero-sized struct that becomes `core::mem::size_of::<T>::()`
 /// when converted using `Into<usize>`.
 #[derive(Default, Debug, Copy, Clone)]
 pub struct SizeOf<T> {
