@@ -3,6 +3,7 @@
 mod size_align;
 
 use core::cell::UnsafeCell;
+use core::fmt;
 use core::mem::{self, MaybeUninit};
 use core::ptr;
 
@@ -209,6 +210,14 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     }
 }
 
+impl<'a> fmt::Debug for BumpInto<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "BumpInto {{ {} bytes free }}", unsafe {
+            (*self.array.get()).len()
+        })
+    }
+}
+
 /// Creates an uninitialized array of `MaybeUninit<u8>` on the stack,
 /// suitable for taking a slice of to pass into `BumpInto::new`.
 #[macro_export]
@@ -280,22 +289,30 @@ mod tests {
         let mut space = space!(192);
         let bump_into = BumpInto::new(&mut space[..]);
 
-        let something1 = bump_into.alloc_n(&[1u32, 258909, 1000][..]).expect("allocation 1 failed");
+        let something1 = bump_into
+            .alloc_n(&[1u32, 258909, 1000][..])
+            .expect("allocation 1 failed");
 
         assert_eq!(something1, &[1u32, 258909, 1000][..]);
 
-        let something2 = bump_into.alloc_n(&[1u64, 258909, 1000, 0][..]).expect("allocation 2 failed");
+        let something2 = bump_into
+            .alloc_n(&[1u64, 258909, 1000, 0][..])
+            .expect("allocation 2 failed");
 
         assert_eq!(something1, &[1u32, 258909, 1000][..]);
         assert_eq!(something2, &[1u64, 258909, 1000, 0][..]);
 
-        let something3 = bump_into.alloc_n_with(5, core::iter::repeat(61921u16)).expect("allocation 3 failed");
+        let something3 = bump_into
+            .alloc_n_with(5, core::iter::repeat(61921u16))
+            .expect("allocation 3 failed");
 
         assert_eq!(something1, &[1u32, 258909, 1000][..]);
         assert_eq!(something2, &[1u64, 258909, 1000, 0][..]);
         assert_eq!(something3, &[61921u16; 5][..]);
 
-        let something4 = bump_into.alloc_n_with(6, core::iter::once(71u64)).expect("allocation 4 failed");
+        let something4 = bump_into
+            .alloc_n_with(6, core::iter::once(71u64))
+            .expect("allocation 4 failed");
 
         assert_eq!(something1, &[1u32, 258909, 1000][..]);
         assert_eq!(something2, &[1u64, 258909, 1000, 0][..]);
@@ -311,7 +328,9 @@ mod tests {
         assert_eq!(something3, &[61921u16; 5][..]);
         assert_eq!(something4, &[71u64][..]);
 
-        let something6 = bump_into.alloc_n_with::<u64, _>(6, None).expect("allocation 6 failed");
+        let something6 = bump_into
+            .alloc_n_with::<u64, _>(6, None)
+            .expect("allocation 6 failed");
 
         assert_eq!(something1, &[1u32, 258909, 1000][..]);
         assert_eq!(something2, &[1u64, 258909, 1000, 0][..]);
@@ -329,9 +348,7 @@ mod tests {
         // allocating an object produces a mutable reference with
         // the same lifetime as the `BumpInto` instance, or `None`
         // if there isn't enough space
-        let number: &mut u64 = bump_into
-            .alloc_with(|| 123)
-            .expect("not enough space");
+        let number: &mut u64 = bump_into.alloc_with(|| 123).expect("not enough space");
         assert_eq!(*number, 123);
         *number = 50000;
         assert_eq!(*number, 50000);
