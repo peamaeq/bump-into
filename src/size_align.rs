@@ -1,6 +1,9 @@
 use core::marker::PhantomData;
 use core::mem;
 
+/// A zero-sized struct that becomes `core::mem::align_of::<T>::()`
+/// when converted using `Into<usize>`.
+#[derive(Default, Debug, Copy, Clone)]
 pub struct SizeOf<T> {
     _phantom: PhantomData<T>,
 }
@@ -21,6 +24,9 @@ impl<T> From<SizeOf<T>> for usize {
     }
 }
 
+/// A zero-sized struct that becomes `core::mem::align_of::<T>::()`
+/// when converted using `Into<usize>`.
+#[derive(Default, Debug, Copy, Clone)]
 pub struct AlignOf<T> {
     _phantom: PhantomData<T>,
 }
