@@ -465,6 +465,101 @@ mod tests {
     }
 
     #[test]
+    fn available_bytes() {
+        let mut space = space!(32);
+
+        {
+            let mut bump_into = BumpInto::new(&mut space[..]);
+
+            assert_eq!(bump_into.available_bytes(), 32);
+            assert_eq!(bump_into.available_spaces(1usize, 1usize), 32);
+
+            bump_into.alloc(0u8).expect("allocation 1 failed");
+
+            assert_eq!(bump_into.available_bytes(), 31);
+            assert_eq!(bump_into.available_spaces(1usize, 1usize), 31);
+
+            let spaces_for_u32 = bump_into.available_spaces(4usize, 4usize);
+
+            bump_into.alloc(0u32).expect("allocation 2 failed");
+
+            assert_eq!(
+                bump_into.available_spaces(4usize, 4usize),
+                spaces_for_u32 - 1
+            );
+
+            {
+                let rest = bump_into.alloc_down_with(core::iter::repeat(0u32));
+
+                assert_eq!(rest.len(), spaces_for_u32 - 1);
+                assert!(rest.len() >= 6);
+            }
+
+            assert_eq!(bump_into.available_spaces(4usize, 4usize), 0);
+            assert!(bump_into.available_bytes() < 4);
+        }
+
+        {
+            let bump_into = BumpInto::new(&mut space[..]);
+
+            assert_eq!(bump_into.available_bytes(), 32);
+            assert_eq!(bump_into.available_spaces(1usize, 1usize), 32);
+
+            let something4 = bump_into.alloc(0u8).expect("allocation 4 failed");
+
+            assert_eq!(*something4, 0);
+
+            let (pointer, count) = bump_into.alloc_space_to_limit_for::<i64>();
+
+            assert_eq!(bump_into.available_spaces(8usize, 8usize), 0);
+            assert!(bump_into.available_bytes() < 8);
+            assert!(count >= 3);
+
+            let pointer = pointer.as_ptr();
+
+            for x in 0..count {
+                unsafe {
+                    core::ptr::write(pointer.add(x), -1);
+                }
+            }
+
+            assert_eq!(*something4, 0);
+        }
+
+        {
+            let bump_into = BumpInto::new(&mut space[..]);
+
+            assert_eq!(bump_into.available_bytes(), 32);
+            assert_eq!(bump_into.available_spaces(1usize, 1usize), 32);
+
+            let something6 = bump_into.alloc(0u8).expect("allocation 6 failed");
+
+            assert_eq!(*something6, 0);
+
+            let rest = unsafe {
+                let mut count = 0;
+
+                bump_into.alloc_down_with_shared(core::iter::from_fn(|| {
+                    if bump_into.available_spaces(4usize, 4usize) > 1 {
+                        count += 1;
+                        Some(count)
+                    } else {
+                        None
+                    }
+                }))
+            };
+
+            assert_eq!(bump_into.available_spaces(4usize, 4usize), 1);
+            assert!(rest.len() >= 6);
+
+            bump_into.alloc(0u32).expect("allocation 8 failed");
+
+            assert_eq!(bump_into.available_spaces(4usize, 4usize), 0);
+            assert!(bump_into.available_bytes() < 4);
+        }
+    }
+
+    #[test]
     fn readme_example() {
         // allocate 64 bytes of uninitialized space on the stack
         let mut bump_into_space = space!(64);
