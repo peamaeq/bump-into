@@ -344,9 +344,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
 
 impl<'a> fmt::Debug for BumpInto<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "BumpInto {{ {} bytes free }}", unsafe {
-            (*self.array.get()).len()
-        })
+        write!(f, "BumpInto {{ {} bytes free }}", self.available_bytes())
     }
 }
 
