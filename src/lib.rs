@@ -283,9 +283,10 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     ///
     /// # Safety
     ///
-    /// Undefined behavior may result if any `alloc_` methods of this
-    /// `BumpInto` are called from within the `next` method of the
-    /// iterator.
+    /// Undefined behavior may result if any methods of this `BumpInto`
+    /// are called from within the `next` method of the iterator, with
+    /// the exception of the `available_bytes` and `available_spaces`
+    /// methods, which are safe.
     pub unsafe fn alloc_down_with_shared<T, I: IntoIterator<Item = T>>(
         &'this self,
         iter: I,
@@ -302,12 +303,16 @@ impl<'this, 'a: 'this> BumpInto<'a> {
             }
         }
 
-        let array = &mut *self.array.get();
+        let (array_start, current_end) = {
+            let array = &mut *self.array.get();
 
-        // since we have to do math to align our output properly,
-        // we use `usize` instead of pointers
-        let array_start = *array as *mut [MaybeUninit<u8>] as *mut MaybeUninit<u8> as usize;
-        let current_end = array_start + array.len();
+            // since we have to do math to align our output properly,
+            // we use `usize` instead of pointers
+            let array_start = *array as *mut [MaybeUninit<u8>] as *mut MaybeUninit<u8> as usize;
+            let current_end = array_start + array.len();
+
+            (array_start, current_end)
+        };
         let aligned_end = (current_end / mem::align_of::<T>()) * mem::align_of::<T>();
 
         if aligned_end <= array_start {
@@ -324,8 +329,12 @@ impl<'this, 'a: 'this> BumpInto<'a> {
 
             if cur_space < array_start || iter_and_write(cur_space as *mut T, &mut iter) {
                 cur_space += mem::size_of::<T>();
-                *array = &mut array[..cur_space - array_start];
                 return core::slice::from_raw_parts_mut(cur_space as *mut T, count);
+            }
+
+            {
+                let array = &mut *self.array.get();
+                *array = &mut array[..cur_space - array_start];
             }
 
             count += 1;
