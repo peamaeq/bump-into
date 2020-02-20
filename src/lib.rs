@@ -493,6 +493,10 @@ mod tests {
 
                 assert_eq!(rest.len(), spaces_for_u32 - 1);
                 assert!(rest.len() >= 6);
+
+                for &x in rest.iter() {
+                    assert_eq!(x, 0u32);
+                }
             }
 
             assert_eq!(bump_into.available_spaces(4usize, 4usize), 0);
@@ -537,7 +541,7 @@ mod tests {
             assert_eq!(*something6, 0);
 
             let rest = unsafe {
-                let mut count = 0;
+                let mut count = 0u32;
 
                 bump_into.alloc_down_with_shared(core::iter::from_fn(|| {
                     if bump_into.available_spaces(4usize, 4usize) > 1 {
@@ -551,6 +555,10 @@ mod tests {
 
             assert_eq!(bump_into.available_spaces(4usize, 4usize), 1);
             assert!(rest.len() >= 6);
+
+            for (a, b) in rest.iter().zip((0..rest.len() as u32).rev()) {
+                assert_eq!(*a, b + 1);
+            }
 
             bump_into.alloc(0u32).expect("allocation 8 failed");
 
