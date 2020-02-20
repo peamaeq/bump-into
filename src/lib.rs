@@ -5,7 +5,7 @@ mod size_align;
 use core::cell::UnsafeCell;
 use core::fmt;
 use core::mem::{self, MaybeUninit};
-use core::ptr;
+use core::ptr::{self, NonNull};
 
 pub use size_align::{AlignOf, SizeOf};
 
@@ -22,6 +22,45 @@ impl<'this, 'a: 'this> BumpInto<'a> {
         }
     }
 
+    /// Returns the number of bytes remaining in the allocator's space.
+    pub fn available_bytes(&'this self) -> usize {
+        unsafe { (*self.array.get()).len() }
+    }
+
+    /// Returns the number of spaces of size `size` that could be
+    /// allocated in a contiguous region ending at alignment `align`
+    /// within the allocator's remaining space.
+    pub fn available_spaces<S: Into<usize>, A: Into<usize>>(
+        &'this self,
+        size: S,
+        align: A,
+    ) -> usize {
+        let size = size.into();
+        let align = align.into();
+
+        if align == 0 {
+            panic!("alignment must not be zero")
+        }
+
+        let array = unsafe { &mut *self.array.get() };
+
+        let array_start = *array as *mut [MaybeUninit<u8>] as *mut MaybeUninit<u8> as usize;
+        let current_end = array_start + array.len();
+        let aligned_end = (current_end / align) * align;
+
+        if aligned_end <= array_start {
+            return 0;
+        }
+
+        let mut available_bytes = aligned_end - array_start;
+
+        if available_bytes > isize::max_value() as usize {
+            available_bytes = isize::max_value() as usize;
+        }
+
+        available_bytes / size
+    }
+
     /// Tries to allocate `size` bytes with alignment `align`.
     /// Returns a null pointer on failure.
     pub fn alloc_space<S: Into<usize>, A: Into<usize>>(
@@ -31,6 +70,10 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     ) -> *mut MaybeUninit<u8> {
         let size = size.into();
         let align = align.into();
+
+        if align == 0 {
+            panic!("alignment must not be zero")
+        }
 
         if size == 0 {
             // optimization for zero-sized types, as pointers to
@@ -90,6 +133,21 @@ impl<'this, 'a: 'this> BumpInto<'a> {
         match size {
             Some(size) => self.alloc_space(size, AlignOf::<T>::new()) as *mut T,
             None => ptr::null_mut(),
+        }
+    }
+
+    /// Allocates space for as many aligned `T` as will fit in the
+    /// free space of this `BumpInto`. Returns a tuple holding a
+    /// pointer to the lowest `T`-space that was just allocated and
+    /// the count of `T` that will fit (which may be zero).
+    pub fn alloc_space_to_limit_for<T>(&'this self) -> (NonNull<T>, usize) {
+        let count = self.available_spaces(SizeOf::<T>::new(), AlignOf::<T>::new());
+
+        let pointer = self.alloc_space(count * mem::size_of::<T>(), AlignOf::<T>::new());
+
+        match NonNull::new(pointer as *mut T) {
+            Some(pointer) => (pointer, count),
+            None => (NonNull::dangling(), 0),
         }
     }
 
