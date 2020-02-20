@@ -453,11 +453,6 @@ mod tests {
             panic!("allocation 5 succeeded")
         }
 
-        assert_eq!(something1, &[1u32, 258909, 1000][..]);
-        assert_eq!(something2, &[1u64, 258909, 1000, 0][..]);
-        assert_eq!(something3, &[61921u16; 5][..]);
-        assert_eq!(something4, &[71u64][..]);
-
         let something6 = bump_into
             .alloc_n_with::<u64, _>(6, None)
             .expect("allocation 6 failed");
