@@ -266,6 +266,71 @@ impl<'this, 'a: 'this> BumpInto<'a> {
             Some(core::slice::from_raw_parts_mut(pointer, count))
         }
     }
+
+    /// Allocates enough space to store as many of the values produced
+    /// by `iter` as possible. Produces a mutable reference to the
+    /// stored results as a slice, in the opposite order to the order
+    /// they were produced in, with the lifetime of this `BumpInto`.
+    pub fn alloc_down_with<T, I: IntoIterator<Item = T>>(
+        &'this mut self,
+        iter: I,
+    ) -> &'this mut [T] {
+        unsafe { self.alloc_down_with_shared(iter) }
+    }
+
+    /// Unsafe version of `alloc_down_with`, taking `self` as a shared
+    /// reference instead of a mutable reference.
+    ///
+    /// # Safety
+    ///
+    /// Undefined behavior may result if any `alloc_` methods of this
+    /// `BumpInto` are called from within the `next` method of the
+    /// iterator.
+    pub unsafe fn alloc_down_with_shared<T, I: IntoIterator<Item = T>>(
+        &'this self,
+        iter: I,
+    ) -> &'this mut [T] {
+        #[inline(always)]
+        unsafe fn iter_and_write<T, I: Iterator<Item = T>>(pointer: *mut T, mut iter: I) -> bool {
+            match iter.next() {
+                Some(item) => {
+                    ptr::write(pointer, item);
+
+                    false
+                }
+                None => true,
+            }
+        }
+
+        let array = &mut *self.array.get();
+
+        // since we have to do math to align our output properly,
+        // we use `usize` instead of pointers
+        let array_start = *array as *mut [MaybeUninit<u8>] as *mut MaybeUninit<u8> as usize;
+        let current_end = array_start + array.len();
+        let aligned_end = (current_end / mem::align_of::<T>()) * mem::align_of::<T>();
+
+        if aligned_end <= array_start {
+            return &mut [];
+        }
+
+        let mut iter = iter.into_iter();
+
+        let mut count = 0;
+        let mut cur_space = aligned_end;
+
+        loop {
+            cur_space -= mem::size_of::<T>();
+
+            if cur_space < array_start || iter_and_write(cur_space as *mut T, &mut iter) {
+                cur_space += mem::size_of::<T>();
+                *array = &mut array[..cur_space - array_start];
+                return core::slice::from_raw_parts_mut(cur_space as *mut T, count);
+            }
+
+            count += 1;
+        }
+    }
 }
 
 impl<'a> fmt::Debug for BumpInto<'a> {
