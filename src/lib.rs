@@ -61,6 +61,12 @@ impl<'this, 'a: 'this> BumpInto<'a> {
         available_bytes / size
     }
 
+    /// Returns the number of `T` that could be allocated in a
+    /// contiguous region within the allocator's remaining space.
+    pub fn available_spaces_for<T>(&'this self) -> usize {
+        self.available_spaces(SizeOf::<T>::new(), AlignOf::<T>::new())
+    }
+
     /// Tries to allocate `size` bytes with alignment `align`.
     /// Returns a null pointer on failure.
     pub fn alloc_space<S: Into<usize>, A: Into<usize>>(
@@ -478,18 +484,20 @@ mod tests {
 
             assert_eq!(bump_into.available_bytes(), 32);
             assert_eq!(bump_into.available_spaces(1usize, 1usize), 32);
+            assert_eq!(bump_into.available_spaces_for::<u8>(), 32);
 
             bump_into.alloc(0u8).expect("allocation 1 failed");
 
             assert_eq!(bump_into.available_bytes(), 31);
             assert_eq!(bump_into.available_spaces(1usize, 1usize), 31);
+            assert_eq!(bump_into.available_spaces_for::<u8>(), 31);
 
-            let spaces_for_u32 = bump_into.available_spaces(4usize, 4usize);
+            let spaces_for_u32 = bump_into.available_spaces_for::<u32>();
 
             bump_into.alloc(0u32).expect("allocation 2 failed");
 
             assert_eq!(
-                bump_into.available_spaces(4usize, 4usize),
+                bump_into.available_spaces_for::<u32>(),
                 spaces_for_u32 - 1
             );
 
@@ -504,7 +512,7 @@ mod tests {
                 }
             }
 
-            assert_eq!(bump_into.available_spaces(4usize, 4usize), 0);
+            assert_eq!(bump_into.available_spaces_for::<u32>(), 0);
             assert!(bump_into.available_bytes() < 4);
         }
 
@@ -513,6 +521,7 @@ mod tests {
 
             assert_eq!(bump_into.available_bytes(), 32);
             assert_eq!(bump_into.available_spaces(1usize, 1usize), 32);
+            assert_eq!(bump_into.available_spaces_for::<u8>(), 32);
 
             let something4 = bump_into.alloc(0u8).expect("allocation 4 failed");
 
@@ -520,7 +529,7 @@ mod tests {
 
             let (pointer, count) = bump_into.alloc_space_to_limit_for::<i64>();
 
-            assert_eq!(bump_into.available_spaces(8usize, 8usize), 0);
+            assert_eq!(bump_into.available_spaces_for::<i64>(), 0);
             assert!(bump_into.available_bytes() < 8);
             assert!(count >= 3);
 
@@ -540,6 +549,7 @@ mod tests {
 
             assert_eq!(bump_into.available_bytes(), 32);
             assert_eq!(bump_into.available_spaces(1usize, 1usize), 32);
+            assert_eq!(bump_into.available_spaces_for::<u8>(), 32);
 
             let something6 = bump_into.alloc(0u8).expect("allocation 6 failed");
 
@@ -549,7 +559,7 @@ mod tests {
                 let mut count = 0u32;
 
                 bump_into.alloc_down_with_shared(core::iter::from_fn(|| {
-                    if bump_into.available_spaces(4usize, 4usize) > 1 {
+                    if bump_into.available_spaces_for::<u32>() > 1 {
                         count += 1;
                         Some(count)
                     } else {
@@ -558,7 +568,7 @@ mod tests {
                 }))
             };
 
-            assert_eq!(bump_into.available_spaces(4usize, 4usize), 1);
+            assert_eq!(bump_into.available_spaces_for::<u32>(), 1);
             assert!(rest.len() >= 6);
 
             for (a, b) in rest.iter().zip((0..rest.len() as u32).rev()) {
@@ -567,7 +577,7 @@ mod tests {
 
             bump_into.alloc(0u32).expect("allocation 8 failed");
 
-            assert_eq!(bump_into.available_spaces(4usize, 4usize), 0);
+            assert_eq!(bump_into.available_spaces_for::<u32>(), 0);
             assert!(bump_into.available_bytes() < 4);
         }
     }
