@@ -268,9 +268,9 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     }
 
     /// Allocates enough space to store as many of the values produced
-    /// by `iter` as possible. Produces a mutable reference to the
-    /// stored results as a slice, in the opposite order to the order
-    /// they were produced in, with the lifetime of this `BumpInto`.
+    /// by `iter.into_iter()` as possible. Produces a mutable reference
+    /// to the stored results as a slice, in the opposite order to the
+    /// order they were produced in, with the lifetime of this `BumpInto`.
     pub fn alloc_down_with<T, I: IntoIterator<Item = T>>(
         &'this mut self,
         iter: I,
