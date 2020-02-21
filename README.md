@@ -18,6 +18,7 @@ let bump_into = BumpInto::new(&mut bump_into_space[..]);
 // if there isn't enough space
 let number: &mut u64 = bump_into
     .alloc_with(|| 123)
+    .ok()
     .expect("not enough space");
 assert_eq!(*number, 123);
 *number = 50000;

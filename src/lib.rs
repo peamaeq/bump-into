@@ -176,7 +176,9 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     ///
     /// On success (i.e. if there was enough space) produces a mutable
     /// reference to the stored result with the lifetime of this `BumpInto`.
-    pub fn alloc_with<T, F: FnOnce() -> T>(&'this self, f: F) -> Option<&'this mut T> {
+    ///
+    /// On failure, produces `f`.
+    pub fn alloc_with<T, F: FnOnce() -> T>(&'this self, f: F) -> Result<&'this mut T, F> {
         #[inline(always)]
         unsafe fn eval_and_write<T, F: FnOnce() -> T>(pointer: *mut T, f: F) {
             // this is an optimization borrowed from bumpalo by fitzgen
@@ -188,13 +190,13 @@ impl<'this, 'a: 'this> BumpInto<'a> {
         let pointer = self.alloc_space_for::<T>();
 
         if pointer.is_null() {
-            return None;
+            return Err(f);
         }
 
         unsafe {
             eval_and_write(pointer, f);
 
-            Some(&mut *pointer)
+            Ok(&mut *pointer)
         }
     }
 
@@ -226,6 +228,8 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     /// reference to the stored results as a slice, with the lifetime of
     /// this `BumpInto`.
     ///
+    /// On failure, produces `iter`.
+    ///
     /// If the iterator ends before producing enough items to fill the
     /// allocated space, the same amount of space is allocated, but the
     /// returned slice is just long enough to hold the items that were
@@ -234,7 +238,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
         &'this self,
         count: usize,
         iter: I,
-    ) -> Option<&'this mut [T]> {
+    ) -> Result<&'this mut [T], I> {
         #[inline(always)]
         unsafe fn iter_and_write<T, I: Iterator<Item = T>>(pointer: *mut T, mut iter: I) -> bool {
             match iter.next() {
@@ -250,7 +254,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
         let pointer = self.alloc_space_for_n::<T>(count);
 
         if pointer.is_null() {
-            return None;
+            return Err(iter);
         }
 
         let mut iter = iter.into_iter();
@@ -259,11 +263,11 @@ impl<'this, 'a: 'this> BumpInto<'a> {
             for index in 0..count {
                 if iter_and_write(pointer.add(index), &mut iter) {
                     // iterator ended before we could fill the whole space.
-                    return Some(core::slice::from_raw_parts_mut(pointer, index));
+                    return Ok(core::slice::from_raw_parts_mut(pointer, index));
                 }
             }
 
-            Some(core::slice::from_raw_parts_mut(pointer, count))
+            Ok(core::slice::from_raw_parts_mut(pointer, count))
         }
     }
 
@@ -396,13 +400,14 @@ mod tests {
 
         let something3 = bump_into
             .alloc_with(|| 251222u64)
+            .ok()
             .expect("allocation 3 failed");
 
         assert_eq!(*something1, 123u64);
         assert_eq!(*something2, 7775u16);
         assert_eq!(*something3, 251222u64);
 
-        if bump_into.alloc_with(|| [0; 128]).is_some() {
+        if bump_into.alloc_with(|| [0; 128]).is_ok() {
             panic!("allocation 4 succeeded");
         }
 
@@ -449,7 +454,7 @@ mod tests {
         assert_eq!(something3, &[61921u16; 5][..]);
         assert_eq!(something4, &[71u64][..]);
 
-        if bump_into.alloc_n_with::<u64, _>(100, None).is_some() {
+        if bump_into.alloc_n_with::<u64, _>(100, None).is_ok() {
             panic!("allocation 5 succeeded")
         }
 
@@ -576,7 +581,7 @@ mod tests {
         // allocating an object produces a mutable reference with
         // the same lifetime as the `BumpInto` instance, or `None`
         // if there isn't enough space
-        let number: &mut u64 = bump_into.alloc_with(|| 123).expect("not enough space");
+        let number: &mut u64 = bump_into.alloc_with(|| 123).ok().expect("not enough space");
         assert_eq!(*number, 123);
         *number = 50000;
         assert_eq!(*number, 50000);
