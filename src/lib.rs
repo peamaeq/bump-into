@@ -295,8 +295,8 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     ///
     /// Undefined behavior may result if any methods of this `BumpInto`
     /// are called from within the `next` method of the iterator, with
-    /// the exception of the `available_bytes` and `available_spaces`
-    /// methods, which are safe.
+    /// the exception of the `available_bytes`, `available_spaces`,
+    /// and `available_spaces_for` methods, which are safe.
     pub unsafe fn alloc_down_with_shared<T, I: IntoIterator<Item = T>>(
         &'this self,
         iter: I,
