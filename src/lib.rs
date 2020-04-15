@@ -39,7 +39,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
         let align = align.into();
 
         if align == 0 {
-            panic!("alignment must not be zero")
+            panic!("alignment must not be zero");
         }
 
         let array = unsafe { &mut *self.array.get() };
@@ -78,7 +78,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
         let align = align.into();
 
         if align == 0 {
-            panic!("alignment must not be zero")
+            panic!("alignment must not be zero");
         }
 
         if size == 0 {
@@ -461,7 +461,7 @@ mod tests {
         assert_eq!(something4, &[71u64][..]);
 
         if bump_into.alloc_n_with::<u64, _>(100, None).is_ok() {
-            panic!("allocation 5 succeeded")
+            panic!("allocation 5 succeeded");
         }
 
         let something6 = bump_into
