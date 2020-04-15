@@ -14,8 +14,8 @@ let mut bump_into_space = bump_into::space!(64);
 let bump_into = BumpInto::new(&mut bump_into_space[..]);
 
 // allocating an object produces a mutable reference with
-// the same lifetime as the `BumpInto` instance, or `None`
-// if there isn't enough space
+// the same lifetime as the `BumpInto` instance, or gives
+// back its argument in `Err` if there isn't enough space
 let number: &mut u64 = bump_into
     .alloc_with(|| 123)
     .ok()
