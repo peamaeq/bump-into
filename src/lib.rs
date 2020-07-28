@@ -447,6 +447,70 @@ macro_rules! space_zeroed {
     }};
 }
 
+/// Creates an uninitialized single `MaybeUninit` on the stack,
+/// with the given capacity and alignment, suitable for passing
+/// into `BumpInto::from_single`.
+///
+/// The alignment given must be suitable for use as the parameter
+/// to repr(align), i.e. (as of Rust 1.45.0) a basic integer
+/// literal.
+///
+/// # Examples
+///
+/// ```rust
+/// use bump_into::space_aligned;
+/// use core::mem;
+///
+/// let mut space = space_aligned!(capacity: 64, align: 4);
+/// assert_eq!(mem::size_of_val(&space), 64);
+/// assert_eq!(mem::align_of_val(&space), 4);
+/// ```
+#[macro_export]
+macro_rules! space_aligned {
+    (capacity: $capacity:expr, align: $align:expr $(,)?) => {{
+        extern crate core;
+
+        #[repr(C, align($align))]
+        struct Space {
+            _contents: [u8; $capacity],
+        }
+
+        core::mem::MaybeUninit::<Space>::uninit()
+    }};
+}
+
+/// Creates a zeroed single `MaybeUninit` on the stack, with the
+/// given capacity and alignment, suitable for passing into
+/// `BumpInto::from_single`.
+///
+/// The alignment given must be suitable for use as the parameter
+/// to repr(align), i.e. (as of Rust 1.45.0) a basic integer
+/// literal.
+///
+/// # Examples
+///
+/// ```rust
+/// use bump_into::space_zeroed_aligned;
+/// use core::mem;
+///
+/// let mut space = space_zeroed_aligned!(capacity: 64, align: 4);
+/// assert_eq!(mem::size_of_val(&space), 64);
+/// assert_eq!(mem::align_of_val(&space), 4);
+/// ```
+#[macro_export]
+macro_rules! space_zeroed_aligned {
+    (capacity: $capacity:expr, align: $align:expr $(,)?) => {{
+        extern crate core;
+
+        #[repr(C, align($align))]
+        struct Space {
+            _contents: [u8; $capacity],
+        }
+
+        core::mem::MaybeUninit::<Space>::zeroed()
+    }};
+}
+
 #[cfg(test)]
 mod tests {
     use crate::*;
@@ -685,6 +749,36 @@ mod tests {
 
             unsafe {
                 for x in core::slice::from_raw_parts(something3_ptr, something3_size) {
+                    assert_eq!(*x, 0);
+                }
+            }
+        }
+
+        {
+            let mut space = space_aligned!(capacity: 32 * 4, align: 4);
+            let space_ptr = &space as *const _;
+            let bump_into = BumpInto::from_single(&mut space);
+
+            let (something4_ptr, something4_size) =
+                bump_into.alloc_space_to_limit_for::<u32>();
+            let something4_ptr = something4_ptr.as_ptr() as *const u32;
+            assert_eq!(space_ptr as *const u32, something4_ptr);
+            assert_eq!(something4_size, 32);
+        }
+
+        {
+            let mut space = space_zeroed_aligned!(capacity: 32 * 4, align: 4);
+            let space_ptr = &space as *const _;
+            let bump_into = BumpInto::from_single(&mut space);
+
+            let (something5_ptr, something5_size) =
+                bump_into.alloc_space_to_limit_for::<u32>();
+            let something5_ptr = something5_ptr.as_ptr() as *const u32;
+            assert_eq!(space_ptr as *const u32, something5_ptr);
+            assert_eq!(something5_size, 32);
+
+            unsafe {
+                for x in core::slice::from_raw_parts(something5_ptr, something5_size) {
                     assert_eq!(*x, 0);
                 }
             }
