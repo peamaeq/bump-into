@@ -16,7 +16,7 @@ pub struct BumpInto<'a> {
 
 impl<'this, 'a: 'this> BumpInto<'a> {
     /// Creates a new `BumpInto`, wrapping a slice of MaybeUninit<S>.
-    pub fn new<S>(array: &'a mut [MaybeUninit<S>]) -> Self {
+    pub fn from_slice<S>(array: &'a mut [MaybeUninit<S>]) -> Self {
         let size = mem::size_of_val(array);
         let ptr = array as *mut [_] as *mut MaybeUninit<u8>;
         let array = unsafe {
@@ -378,7 +378,7 @@ impl<'a> fmt::Debug for BumpInto<'a> {
 }
 
 /// Creates an uninitialized array of `MaybeUninit` on the stack,
-/// suitable for taking a slice of to pass into `BumpInto::new`.
+/// suitable for taking a slice of to pass into `BumpInto::from_slice`.
 ///
 /// # Examples
 ///
@@ -413,7 +413,7 @@ macro_rules! space {
 }
 
 /// Creates a zeroed array of `MaybeUninit` on the stack,
-/// suitable for taking a slice of to pass into `BumpInto::new`.
+/// suitable for taking a slice of to pass into `BumpInto::from_slice`.
 ///
 /// # Examples
 ///
@@ -518,7 +518,7 @@ mod tests {
     #[test]
     fn alloc() {
         let mut space = space!(32);
-        let bump_into = BumpInto::new(&mut space[..]);
+        let bump_into = BumpInto::from_slice(&mut space[..]);
 
         let something1 = bump_into.alloc(123u64).expect("allocation 1 failed");
 
@@ -553,7 +553,7 @@ mod tests {
     #[test]
     fn alloc_n() {
         let mut space = space!(192);
-        let bump_into = BumpInto::new(&mut space[..]);
+        let bump_into = BumpInto::from_slice(&mut space[..]);
 
         let something1 = bump_into
             .alloc_n(&[1u32, 258909, 1000][..])
@@ -605,7 +605,7 @@ mod tests {
         let mut space = space!(32);
 
         {
-            let mut bump_into = BumpInto::new(&mut space[..]);
+            let mut bump_into = BumpInto::from_slice(&mut space[..]);
 
             assert_eq!(bump_into.available_bytes(), 32);
             assert_eq!(bump_into.available_spaces(1usize, 1usize), 32);
@@ -642,7 +642,7 @@ mod tests {
         }
 
         {
-            let bump_into = BumpInto::new(&mut space[..]);
+            let bump_into = BumpInto::from_slice(&mut space[..]);
 
             assert_eq!(bump_into.available_bytes(), 32);
             assert_eq!(bump_into.available_spaces(1usize, 1usize), 32);
@@ -670,7 +670,7 @@ mod tests {
         }
 
         {
-            let bump_into = BumpInto::new(&mut space[..]);
+            let bump_into = BumpInto::from_slice(&mut space[..]);
 
             assert_eq!(bump_into.available_bytes(), 32);
             assert_eq!(bump_into.available_spaces(1usize, 1usize), 32);
@@ -711,7 +711,7 @@ mod tests {
     fn space() {
         {
             let mut space = space_zeroed!(32);
-            let bump_into = BumpInto::new(&mut space[..]);
+            let bump_into = BumpInto::from_slice(&mut space[..]);
 
             for _ in 0..32 {
                 let something1 = bump_into.alloc_space_for::<u8>();
@@ -727,7 +727,7 @@ mod tests {
         {
             let mut space = space!(u32; 32);
             let space_ptr = &space as *const _;
-            let bump_into = BumpInto::new(&mut space[..]);
+            let bump_into = BumpInto::from_slice(&mut space[..]);
 
             let (something2_ptr, something2_size) =
                 bump_into.alloc_space_to_limit_for::<u32>();
@@ -739,7 +739,7 @@ mod tests {
         {
             let mut space = space_zeroed!(u32; 32);
             let space_ptr = &space as *const _;
-            let bump_into = BumpInto::new(&mut space[..]);
+            let bump_into = BumpInto::from_slice(&mut space[..]);
 
             let (something3_ptr, something3_size) =
                 bump_into.alloc_space_to_limit_for::<u32>();
@@ -812,7 +812,7 @@ mod tests {
     fn readme_example() {
         // allocate 64 bytes of uninitialized space on the stack
         let mut bump_into_space = space!(64);
-        let bump_into = BumpInto::new(&mut bump_into_space[..]);
+        let bump_into = BumpInto::from_slice(&mut bump_into_space[..]);
 
         // allocating an object produces a mutable reference with
         // the same lifetime as the `BumpInto` instance, or `None`
