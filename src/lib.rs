@@ -15,8 +15,27 @@ pub struct BumpInto<'a> {
 }
 
 impl<'this, 'a: 'this> BumpInto<'a> {
-    /// Creates a new `BumpInto`, wrapping a slice of MaybeUninit<u8>.
-    pub fn new(array: &'a mut [MaybeUninit<u8>]) -> Self {
+    /// Creates a new `BumpInto`, wrapping a slice of MaybeUninit<S>.
+    pub fn new<S>(array: &'a mut [MaybeUninit<S>]) -> Self {
+        let size = mem::size_of_val(array);
+        let ptr = array as *mut [_] as *mut MaybeUninit<u8>;
+        let array = unsafe {
+            core::slice::from_raw_parts_mut(ptr, size)
+        };
+
+        BumpInto {
+            array: UnsafeCell::new(array),
+        }
+    }
+
+    /// Creates a new `BumpInto`, wrapping a single MaybeUninit<S>.
+    pub fn from_single<S>(single: &'a mut MaybeUninit<S>) -> Self {
+        let size = mem::size_of_val(single);
+        let ptr = single.as_mut_ptr() as *mut MaybeUninit<u8>;
+        let array = unsafe {
+            core::slice::from_raw_parts_mut(ptr, size)
+        };
+
         BumpInto {
             array: UnsafeCell::new(array),
         }
@@ -358,29 +377,71 @@ impl<'a> fmt::Debug for BumpInto<'a> {
     }
 }
 
-/// Creates an uninitialized array of `MaybeUninit<u8>` on the stack,
+/// Creates an uninitialized array of `MaybeUninit` on the stack,
 /// suitable for taking a slice of to pass into `BumpInto::new`.
+///
+/// # Examples
+///
+/// ```rust
+/// use bump_into::space;
+/// use core::mem;
+///
+/// // an array of MaybeUninit<u8> is created by default:
+/// let mut space = space!(64);
+/// assert_eq!(mem::size_of_val(&space), 64);
+/// assert_eq!(mem::align_of_val(&space), 1);
+/// // you can also specify a type if you need your space to
+/// // have a particular alignment:
+/// let mut space = space!(u32; 16);
+/// assert_eq!(mem::size_of_val(&space), 64);
+/// assert_eq!(mem::align_of_val(&space), 4);
+/// ```
 #[macro_export]
 macro_rules! space {
-    ($capacity:expr) => {{
+    ($capacity:expr) => {
+        space!(u8; $capacity)
+    };
+
+    ($like_ty:ty; $capacity:expr) => {{
         extern crate core;
 
         unsafe {
-            core::mem::MaybeUninit::<[core::mem::MaybeUninit<u8>; $capacity]>::uninit()
+            core::mem::MaybeUninit::<[core::mem::MaybeUninit<$like_ty>; $capacity]>::uninit()
                 .assume_init()
         }
     }};
 }
 
-/// Creates a zeroed array of `MaybeUninit<u8>` on the stack,
+/// Creates a zeroed array of `MaybeUninit` on the stack,
 /// suitable for taking a slice of to pass into `BumpInto::new`.
+///
+/// # Examples
+///
+/// ```rust
+/// use bump_into::space_zeroed;
+/// use core::mem;
+///
+/// // an array of MaybeUninit<u8> is created by default:
+/// let mut space = space_zeroed!(64);
+/// assert_eq!(mem::size_of_val(&space), 64);
+/// assert_eq!(mem::align_of_val(&space), 1);
+/// // you can also specify a type if you need your space to
+/// // have a particular alignment:
+/// let mut space = space_zeroed!(u32; 16);
+/// assert_eq!(mem::size_of_val(&space), 64);
+/// assert_eq!(mem::align_of_val(&space), 4);
+/// ```
 #[macro_export]
 macro_rules! space_zeroed {
-    ($capacity:expr) => {{
+    ($capacity:expr) => {
+        space_zeroed!(u8; $capacity)
+    };
+
+    ($like_ty:ty; $capacity:expr) => {{
         extern crate core;
 
         unsafe {
-            core::mem::MaybeUninit::<[core::mem::MaybeUninit<u8>; $capacity]>::zeroed()
+            core::mem::MaybeUninit::<[core::mem::MaybeUninit<$like_ty>; $capacity]>::zeroed()
                 .assume_init()
         }
     }};
@@ -579,6 +640,77 @@ mod tests {
 
             assert_eq!(bump_into.available_spaces_for::<u32>(), 0);
             assert!(bump_into.available_bytes() < 4);
+        }
+    }
+
+    #[test]
+    fn space() {
+        {
+            let mut space = space_zeroed!(32);
+            let bump_into = BumpInto::new(&mut space[..]);
+
+            for _ in 0..32 {
+                let something1 = bump_into.alloc_space_for::<u8>();
+                if something1.is_null() {
+                    panic!("allocation 1 (in loop) failed");
+                }
+                unsafe {
+                    assert_eq!(*something1, 0);
+                }
+            }
+        }
+
+        {
+            let mut space = space!(u32; 32);
+            let space_ptr = &space as *const _;
+            let bump_into = BumpInto::new(&mut space[..]);
+
+            let (something2_ptr, something2_size) =
+                bump_into.alloc_space_to_limit_for::<u32>();
+            let something2_ptr = something2_ptr.as_ptr() as *const u32;
+            assert_eq!(space_ptr as *const u32, something2_ptr);
+            assert_eq!(something2_size, 32);
+        }
+
+        {
+            let mut space = space_zeroed!(u32; 32);
+            let space_ptr = &space as *const _;
+            let bump_into = BumpInto::new(&mut space[..]);
+
+            let (something3_ptr, something3_size) =
+                bump_into.alloc_space_to_limit_for::<u32>();
+            let something3_ptr = something3_ptr.as_ptr() as *const u32;
+            assert_eq!(space_ptr as *const u32, something3_ptr);
+            assert_eq!(something3_size, 32);
+
+            unsafe {
+                for x in core::slice::from_raw_parts(something3_ptr, something3_size) {
+                    assert_eq!(*x, 0);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn single() {
+        use core::mem::MaybeUninit;
+
+        let mut space = MaybeUninit::<u32>::uninit();
+
+        {
+            let bump_into = BumpInto::from_single(&mut space);
+            let something1 = bump_into.alloc(0x8359u16).expect("allocation 1 failed");
+            let something2 = bump_into.alloc(0x1312u16).expect("allocation 2 failed");
+            assert_eq!(bump_into.available_bytes(), 0);
+            assert_eq!(*something1, 0x8359);
+            assert_eq!(*something2, 0x1312);
+            *something1 = 0x1312;
+            assert_eq!(*something1, 0x1312);
+            assert_eq!(*something2, 0x1312);
+        }
+
+        unsafe {
+            assert_eq!(space.assume_init(), 0x13121312);
         }
     }
 
