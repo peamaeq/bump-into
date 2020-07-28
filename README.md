@@ -11,7 +11,7 @@ use bump_into::{self, BumpInto};
 
 // allocate 64 bytes of uninitialized space on the stack
 let mut bump_into_space = bump_into::space!(64);
-let bump_into = BumpInto::new(&mut bump_into_space[..]);
+let bump_into = BumpInto::from_slice(&mut bump_into_space[..]);
 
 // allocating an object produces a mutable reference with
 // the same lifetime as the `BumpInto` instance, or gives
