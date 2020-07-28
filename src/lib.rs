@@ -15,7 +15,7 @@ pub struct BumpInto<'a> {
 }
 
 impl<'this, 'a: 'this> BumpInto<'a> {
-    /// Creates a new `BumpInto`, wrapping a slice of MaybeUninit<S>.
+    /// Creates a new `BumpInto`, wrapping a slice of `MaybeUninit<S>`.
     pub fn from_slice<S>(array: &'a mut [MaybeUninit<S>]) -> Self {
         let size = mem::size_of_val(array);
         let ptr = array as *mut [_] as *mut MaybeUninit<u8>;
@@ -28,7 +28,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
         }
     }
 
-    /// Creates a new `BumpInto`, wrapping a single MaybeUninit<S>.
+    /// Creates a new `BumpInto`, wrapping a single `MaybeUninit<S>`.
     pub fn from_single<S>(single: &'a mut MaybeUninit<S>) -> Self {
         let size = mem::size_of_val(single);
         let ptr = single.as_mut_ptr() as *mut MaybeUninit<u8>;
