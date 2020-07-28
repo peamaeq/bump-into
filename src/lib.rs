@@ -398,9 +398,14 @@ impl<'a> fmt::Debug for BumpInto<'a> {
 /// ```
 #[macro_export]
 macro_rules! space {
-    ($capacity:expr) => {
-        space!(u8; $capacity)
-    };
+    ($capacity:expr) => {{
+        extern crate core;
+
+        unsafe {
+            core::mem::MaybeUninit::<[core::mem::MaybeUninit<u8>; $capacity]>::uninit()
+                .assume_init()
+        }
+    }};
 
     ($like_ty:ty; $capacity:expr) => {{
         extern crate core;
@@ -433,9 +438,14 @@ macro_rules! space {
 /// ```
 #[macro_export]
 macro_rules! space_zeroed {
-    ($capacity:expr) => {
-        space_zeroed!(u8; $capacity)
-    };
+    ($capacity:expr) => {{
+        extern crate core;
+
+        unsafe {
+            core::mem::MaybeUninit::<[core::mem::MaybeUninit<u8>; $capacity]>::zeroed()
+                .assume_init()
+        }
+    }};
 
     ($like_ty:ty; $capacity:expr) => {{
         extern crate core;
