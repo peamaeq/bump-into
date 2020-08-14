@@ -1,5 +1,12 @@
 # bump-into
 
+[![crates.io][crates_io_img]][crates_io_page] [![docs.rs][docs_rs_img]][docs_rs_page]
+
+[crates_io_img]: https://img.shields.io/crates/v/bump-into.svg
+[crates_io_page]: https://crates.io/crates/bump-into
+[docs_rs_img]: https://docs.rs/bump-into/badge.svg
+[docs_rs_page]: https://docs.rs/bump-into
+
 A `no_std` bump allocator over an arbitrary region of memory. Can
 be used to pass objects up the stack when it would otherwise be
 inconvenient; for instance, if the objects are dynamically sized.
