@@ -238,9 +238,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
         }
 
         unsafe {
-            for (index, &x) in xs.iter().enumerate() {
-                ptr::write(pointer.add(index), x);
-            }
+            ptr::copy_nonoverlapping(xs as *const [T] as *const T, pointer, xs.len());
 
             Some(core::slice::from_raw_parts_mut(pointer, xs.len()))
         }
