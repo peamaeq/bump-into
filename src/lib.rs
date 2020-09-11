@@ -182,7 +182,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     /// reference to `x` with the lifetime of this `BumpInto`.
     ///
     /// On failure, produces `x`.
-    pub fn alloc<T>(&'this self, x: T) -> Result<&'this mut T, T> {
+    pub fn alloc<T>(&'this self, x: T) -> Result<&'a mut T, T> {
         let pointer = self.alloc_space_for::<T>();
 
         if pointer.is_null() {
@@ -203,7 +203,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     /// reference to the stored result with the lifetime of this `BumpInto`.
     ///
     /// On failure, produces `f`.
-    pub fn alloc_with<T, F: FnOnce() -> T>(&'this self, f: F) -> Result<&'this mut T, F> {
+    pub fn alloc_with<T, F: FnOnce() -> T>(&'this self, f: F) -> Result<&'a mut T, F> {
         #[inline(always)]
         unsafe fn eval_and_write<T, F: FnOnce() -> T>(pointer: *mut T, f: F) {
             // this is an optimization borrowed from bumpalo by fitzgen
@@ -230,7 +230,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     ///
     /// On success (i.e. if there was enough space) produces a mutable
     /// reference to the copy with the lifetime of this `BumpInto`.
-    pub fn alloc_n<T: Copy>(&'this self, xs: &[T]) -> Option<&'this mut [T]> {
+    pub fn alloc_n<T: Copy>(&'this self, xs: &[T]) -> Option<&'a mut [T]> {
         let pointer = self.alloc_space(mem::size_of_val(xs), AlignOf::<T>::new()) as *mut T;
 
         if pointer.is_null() {
@@ -261,7 +261,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
         &'this self,
         count: usize,
         iter: I,
-    ) -> Result<&'this mut [T], I> {
+    ) -> Result<&'a mut [T], I> {
         #[inline(always)]
         unsafe fn iter_and_write<T, I: Iterator<Item = T>>(pointer: *mut T, mut iter: I) -> bool {
             match iter.next() {
@@ -301,7 +301,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     pub fn alloc_down_with<T, I: IntoIterator<Item = T>>(
         &'this mut self,
         iter: I,
-    ) -> &'this mut [T] {
+    ) -> &'a mut [T] {
         unsafe { self.alloc_down_with_shared(iter) }
     }
 
@@ -317,7 +317,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     pub unsafe fn alloc_down_with_shared<T, I: IntoIterator<Item = T>>(
         &'this self,
         iter: I,
-    ) -> &'this mut [T] {
+    ) -> &'a mut [T] {
         #[inline(always)]
         unsafe fn iter_and_write<T, I: Iterator<Item = T>>(pointer: *mut T, mut iter: I) -> bool {
             match iter.next() {
