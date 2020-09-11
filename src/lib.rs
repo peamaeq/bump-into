@@ -817,6 +817,20 @@ mod tests {
     }
 
     #[test]
+    fn moving() {
+        let mut space = space!(32);
+        let bump_into = BumpInto::from_slice(&mut space[..]);
+
+        let something1 = bump_into.alloc(123u64).expect("allocation 1 failed");
+
+        assert_eq!(*something1, 123u64);
+
+        core::mem::drop(bump_into);
+
+        assert_eq!(*something1, 123u64);
+    }
+
+    #[test]
     fn readme_example() {
         // allocate 64 bytes of uninitialized space on the stack
         let mut bump_into_space = space!(64);
