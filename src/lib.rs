@@ -19,9 +19,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     pub fn from_slice<S>(array: &'a mut [MaybeUninit<S>]) -> Self {
         let size = mem::size_of_val(array);
         let ptr = array as *mut [_] as *mut MaybeUninit<u8>;
-        let array = unsafe {
-            core::slice::from_raw_parts_mut(ptr, size)
-        };
+        let array = unsafe { core::slice::from_raw_parts_mut(ptr, size) };
 
         BumpInto {
             array: UnsafeCell::new(array),
@@ -32,9 +30,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     pub fn from_single<S>(single: &'a mut MaybeUninit<S>) -> Self {
         let size = mem::size_of_val(single);
         let ptr = single.as_mut_ptr() as *mut MaybeUninit<u8>;
-        let array = unsafe {
-            core::slice::from_raw_parts_mut(ptr, size)
-        };
+        let array = unsafe { core::slice::from_raw_parts_mut(ptr, size) };
 
         BumpInto {
             array: UnsafeCell::new(array),
@@ -298,10 +294,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     /// by `iter.into_iter()` as possible. Produces a mutable reference
     /// to the stored results as a slice, in the opposite order to the
     /// order they were produced in, with the lifetime of this `BumpInto`.
-    pub fn alloc_down_with<T, I: IntoIterator<Item = T>>(
-        &'this mut self,
-        iter: I,
-    ) -> &'a mut [T] {
+    pub fn alloc_down_with<T, I: IntoIterator<Item = T>>(&'this mut self, iter: I) -> &'a mut [T] {
         unsafe { self.alloc_down_with_shared(iter) }
     }
 
@@ -629,10 +622,7 @@ mod tests {
 
             bump_into.alloc(0u32).expect("allocation 2 failed");
 
-            assert_eq!(
-                bump_into.available_spaces_for::<u32>(),
-                spaces_for_u32 - 1
-            );
+            assert_eq!(bump_into.available_spaces_for::<u32>(), spaces_for_u32 - 1);
 
             {
                 let rest = bump_into.alloc_down_with(core::iter::repeat(0u32));
@@ -737,8 +727,7 @@ mod tests {
             let space_ptr = &space as *const _;
             let bump_into = BumpInto::from_slice(&mut space[..]);
 
-            let (something2_ptr, something2_size) =
-                bump_into.alloc_space_to_limit_for::<u32>();
+            let (something2_ptr, something2_size) = bump_into.alloc_space_to_limit_for::<u32>();
             let something2_ptr = something2_ptr.as_ptr() as *const u32;
             assert_eq!(space_ptr as *const u32, something2_ptr);
             assert_eq!(something2_size, 32);
@@ -749,8 +738,7 @@ mod tests {
             let space_ptr = &space as *const _;
             let bump_into = BumpInto::from_slice(&mut space[..]);
 
-            let (something3_ptr, something3_size) =
-                bump_into.alloc_space_to_limit_for::<u32>();
+            let (something3_ptr, something3_size) = bump_into.alloc_space_to_limit_for::<u32>();
             let something3_ptr = something3_ptr.as_ptr() as *const u32;
             assert_eq!(space_ptr as *const u32, something3_ptr);
             assert_eq!(something3_size, 32);
@@ -767,8 +755,7 @@ mod tests {
             let space_ptr = &space as *const _;
             let bump_into = BumpInto::from_single(&mut space);
 
-            let (something4_ptr, something4_size) =
-                bump_into.alloc_space_to_limit_for::<u32>();
+            let (something4_ptr, something4_size) = bump_into.alloc_space_to_limit_for::<u32>();
             let something4_ptr = something4_ptr.as_ptr() as *const u32;
             assert_eq!(space_ptr as *const u32, something4_ptr);
             assert_eq!(something4_size, 32);
@@ -779,8 +766,7 @@ mod tests {
             let space_ptr = &space as *const _;
             let bump_into = BumpInto::from_single(&mut space);
 
-            let (something5_ptr, something5_size) =
-                bump_into.alloc_space_to_limit_for::<u32>();
+            let (something5_ptr, something5_size) = bump_into.alloc_space_to_limit_for::<u32>();
             let something5_ptr = something5_ptr.as_ptr() as *const u32;
             assert_eq!(space_ptr as *const u32, something5_ptr);
             assert_eq!(something5_size, 32);
