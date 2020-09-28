@@ -345,12 +345,18 @@ impl<'this, 'a: 'this> BumpInto<'a> {
         let mut cur_space = aligned_end;
 
         loop {
-            cur_space -= mem::size_of::<T>();
+            let next_space = cur_space.checked_sub(mem::size_of::<T>());
 
-            if cur_space < array_start || iter_and_write(cur_space as *mut T, &mut iter) {
-                cur_space += mem::size_of::<T>();
+            let (finished, next_space) = match next_space.filter(|x| *x >= array_start) {
+                Some(next_space) => (iter_and_write(next_space as *mut T, &mut iter), next_space),
+                None => (true, cur_space),
+            };
+
+            if finished {
                 return core::slice::from_raw_parts_mut(cur_space as *mut T, count);
             }
+
+            cur_space = next_space;
 
             {
                 let array = &mut *self.array.get();
