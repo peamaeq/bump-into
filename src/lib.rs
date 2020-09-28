@@ -311,12 +311,17 @@ impl<'this, 'a: 'this> BumpInto<'a> {
         &'this self,
         iter: I,
     ) -> &'a mut [T] {
-        let array = &mut *self.array.get();
+        let (array_start, current_end) = {
+            let array = &mut *self.array.get();
 
-        // since we have to do math to align our output properly,
-        // we use `usize` instead of pointers
-        let array_start = *array as *mut [MaybeUninit<u8>] as *mut MaybeUninit<u8> as usize;
-        let current_end = array_start + array.len();
+            // since we have to do math to align our output properly,
+            // we use `usize` instead of pointers
+            let array_start = *array as *mut [MaybeUninit<u8>] as *mut MaybeUninit<u8> as usize;
+            let current_end = array_start + array.len();
+
+            (array_start, current_end)
+        };
+
         let aligned_end = (current_end / mem::align_of::<T>()) * mem::align_of::<T>();
 
         if aligned_end <= array_start {
@@ -336,7 +341,10 @@ impl<'this, 'a: 'this> BumpInto<'a> {
                     match iter.next() {
                         Some(item) => {
                             cur_space = next_space;
-                            *array = &mut array[..cur_space - array_start];
+                            {
+                                let array = &mut *self.array.get();
+                                *array = &mut array[..cur_space - array_start];
+                            }
         
                             ptr::write(cur_space as *mut T, item);
         
