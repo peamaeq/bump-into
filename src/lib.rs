@@ -545,7 +545,7 @@ mod tests {
         assert_eq!(*something2, 7775u16);
         assert_eq!(*something3, 251222u64);
 
-        if bump_into.alloc_with(|| [0; 128]).is_ok() {
+        if bump_into.alloc_with(|| [0u32; 128]).is_ok() {
             panic!("allocation 4 succeeded");
         }
 
