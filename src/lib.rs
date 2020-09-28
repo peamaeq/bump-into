@@ -524,7 +524,7 @@ mod tests {
 
     #[test]
     fn alloc() {
-        let mut space = space!(32);
+        let mut space = space!(64);
         let bump_into = BumpInto::from_slice(&mut space[..]);
 
         let something1 = bump_into.alloc(123u64).expect("allocation 1 failed");
