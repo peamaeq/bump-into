@@ -337,22 +337,20 @@ impl<'this, 'a: 'this> BumpInto<'a> {
             let next_space = cur_space.checked_sub(mem::size_of::<T>());
 
             let finished = match next_space {
-                Some(next_space) if next_space >= array_start => {
-                    match iter.next() {
-                        Some(item) => {
-                            cur_space = next_space;
-                            {
-                                let array = &mut *self.array.get();
-                                *array = &mut array[..cur_space - array_start];
-                            }
-        
-                            ptr::write(cur_space as *mut T, item);
-        
-                            false
+                Some(next_space) if next_space >= array_start => match iter.next() {
+                    Some(item) => {
+                        cur_space = next_space;
+                        {
+                            let array = &mut *self.array.get();
+                            *array = &mut array[..cur_space - array_start];
                         }
-                        None => true,
+
+                        ptr::write(cur_space as *mut T, item);
+
+                        false
                     }
-                }
+                    None => true,
+                },
                 _ => true,
             };
 
