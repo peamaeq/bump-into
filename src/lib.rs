@@ -311,28 +311,12 @@ impl<'this, 'a: 'this> BumpInto<'a> {
         &'this self,
         iter: I,
     ) -> &'a mut [T] {
-        #[inline(always)]
-        unsafe fn iter_and_write<T, I: Iterator<Item = T>>(pointer: *mut T, mut iter: I) -> bool {
-            match iter.next() {
-                Some(item) => {
-                    ptr::write(pointer, item);
+        let array = &mut *self.array.get();
 
-                    false
-                }
-                None => true,
-            }
-        }
-
-        let (array_start, current_end) = {
-            let array = &mut *self.array.get();
-
-            // since we have to do math to align our output properly,
-            // we use `usize` instead of pointers
-            let array_start = *array as *mut [MaybeUninit<u8>] as *mut MaybeUninit<u8> as usize;
-            let current_end = array_start + array.len();
-
-            (array_start, current_end)
-        };
+        // since we have to do math to align our output properly,
+        // we use `usize` instead of pointers
+        let array_start = *array as *mut [MaybeUninit<u8>] as *mut MaybeUninit<u8> as usize;
+        let current_end = array_start + array.len();
         let aligned_end = (current_end / mem::align_of::<T>()) * mem::align_of::<T>();
 
         if aligned_end <= array_start {
@@ -347,20 +331,25 @@ impl<'this, 'a: 'this> BumpInto<'a> {
         loop {
             let next_space = cur_space.checked_sub(mem::size_of::<T>());
 
-            let (finished, next_space) = match next_space.filter(|x| *x >= array_start) {
-                Some(next_space) => (iter_and_write(next_space as *mut T, &mut iter), next_space),
-                None => (true, cur_space),
+            let finished = match next_space {
+                Some(next_space) if next_space >= array_start => {
+                    match iter.next() {
+                        Some(item) => {
+                            cur_space = next_space;
+                            *array = &mut array[..cur_space - array_start];
+        
+                            ptr::write(cur_space as *mut T, item);
+        
+                            false
+                        }
+                        None => true,
+                    }
+                }
+                _ => true,
             };
 
             if finished {
                 return core::slice::from_raw_parts_mut(cur_space as *mut T, count);
-            }
-
-            cur_space = next_space;
-
-            {
-                let array = &mut *self.array.get();
-                *array = &mut array[..cur_space - array_start];
             }
 
             count += 1;
