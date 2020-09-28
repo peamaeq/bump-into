@@ -375,21 +375,21 @@ impl<'a> fmt::Debug for BumpInto<'a> {
 /// # Examples
 ///
 /// ```rust
-/// use bump_into::space;
+/// use bump_into::space_uninit;
 /// use core::mem;
 ///
 /// // an array of MaybeUninit<u8> is created by default:
-/// let mut space = space!(64);
+/// let mut space = space_uninit!(64);
 /// assert_eq!(mem::size_of_val(&space), 64);
 /// assert_eq!(mem::align_of_val(&space), 1);
 /// // you can also specify a type if you need your space to
 /// // have a particular alignment:
-/// let mut space = space!(u32; 16);
+/// let mut space = space_uninit!(u32; 16);
 /// assert_eq!(mem::size_of_val(&space), 64);
 /// assert_eq!(mem::align_of_val(&space), 4);
 /// ```
 #[macro_export]
-macro_rules! space {
+macro_rules! space_uninit {
     ($capacity:expr) => {{
         extern crate core;
 
@@ -460,15 +460,15 @@ macro_rules! space_zeroed {
 /// # Examples
 ///
 /// ```rust
-/// use bump_into::space_aligned;
+/// use bump_into::space_uninit_aligned;
 /// use core::mem;
 ///
-/// let mut space = space_aligned!(capacity: 64, align: 4);
+/// let mut space = space_uninit_aligned!(capacity: 64, align: 4);
 /// assert_eq!(mem::size_of_val(&space), 64);
 /// assert_eq!(mem::align_of_val(&space), 4);
 /// ```
 #[macro_export]
-macro_rules! space_aligned {
+macro_rules! space_uninit_aligned {
     (capacity: $capacity:expr, align: $align:expr $(,)?) => {{
         extern crate core;
 
@@ -519,7 +519,7 @@ mod tests {
 
     #[test]
     fn alloc() {
-        let mut space = space!(64);
+        let mut space = space_uninit!(64);
         let bump_into = BumpInto::from_slice(&mut space[..]);
 
         let something1 = bump_into.alloc(123u64).expect("allocation 1 failed");
@@ -554,7 +554,7 @@ mod tests {
 
     #[test]
     fn alloc_n() {
-        let mut space = space!(192);
+        let mut space = space_uninit!(192);
         let bump_into = BumpInto::from_slice(&mut space[..]);
 
         let something1 = bump_into
@@ -604,7 +604,7 @@ mod tests {
 
     #[test]
     fn available_bytes() {
-        let mut space = space!(32);
+        let mut space = space_uninit!(32);
 
         {
             let mut bump_into = BumpInto::from_slice(&mut space[..]);
@@ -724,7 +724,7 @@ mod tests {
         }
 
         {
-            let mut space = space!(u32; 32);
+            let mut space = space_uninit!(u32; 32);
             let space_ptr = &space as *const _;
             let bump_into = BumpInto::from_slice(&mut space[..]);
 
@@ -752,7 +752,7 @@ mod tests {
         }
 
         {
-            let mut space = space_aligned!(capacity: 32 * 4, align: 4);
+            let mut space = space_uninit_aligned!(capacity: 32 * 4, align: 4);
             let space_ptr = &space as *const _;
             let bump_into = BumpInto::from_single(&mut space);
 
@@ -805,7 +805,7 @@ mod tests {
 
     #[test]
     fn moving() {
-        let mut space = space!(32);
+        let mut space = space_uninit!(32);
         let bump_into = BumpInto::from_slice(&mut space[..]);
 
         let something1 = bump_into.alloc(123u64).expect("allocation 1 failed");
@@ -820,7 +820,7 @@ mod tests {
     #[test]
     fn readme_example() {
         // allocate 64 bytes of uninitialized space on the stack
-        let mut bump_into_space = space!(64);
+        let mut bump_into_space = space_uninit!(64);
         let bump_into = BumpInto::from_slice(&mut bump_into_space[..]);
 
         // allocating an object produces a mutable reference with
