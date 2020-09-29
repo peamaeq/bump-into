@@ -459,13 +459,12 @@ macro_rules! space_zeroed {
     }};
 }
 
-/// Creates an uninitialized single `MaybeUninit` on the stack,
-/// with the given capacity and alignment, suitable for passing
-/// into `BumpInto::from_single`.
+/// Creates an uninitialized array of one `MaybeUninit` on the stack,
+/// with the given capacity and alignment, suitable for taking a slice
+/// of to pass into `BumpInto::from_slice`.
 ///
 /// The alignment given must be suitable for use as the parameter
-/// to repr(align), i.e. (as of Rust 1.45.0) a basic integer
-/// literal.
+/// to repr(align), i.e. (as of Rust 1.46.0) an integer literal.
 ///
 /// # Examples
 ///
@@ -479,7 +478,7 @@ macro_rules! space_zeroed {
 /// ```
 #[macro_export]
 macro_rules! space_uninit_aligned {
-    (capacity: $capacity:expr, align: $align:expr $(,)?) => {{
+    (capacity: $capacity:expr, align: $align:literal $(,)?) => {{
         extern crate core;
 
         #[repr(C, align($align))]
@@ -487,17 +486,19 @@ macro_rules! space_uninit_aligned {
             _contents: [u8; $capacity],
         }
 
-        core::mem::MaybeUninit::<Space>::uninit()
+        unsafe {
+            core::mem::MaybeUninit::<[core::mem::MaybeUninit<Space>; 1]>::uninit()
+                .assume_init()
+        }
     }};
 }
 
-/// Creates a zeroed single `MaybeUninit` on the stack, with the
-/// given capacity and alignment, suitable for passing into
-/// `BumpInto::from_single`.
+/// Creates a zeroed array of one `MaybeUninit` on the stack, with the
+/// given capacity and alignment, suitable for taking a slice of to
+/// pass into `BumpInto::from_slice`.
 ///
 /// The alignment given must be suitable for use as the parameter
-/// to repr(align), i.e. (as of Rust 1.45.0) a basic integer
-/// literal.
+/// to repr(align), i.e. (as of Rust 1.46.0) an integer literal.
 ///
 /// # Examples
 ///
@@ -511,7 +512,7 @@ macro_rules! space_uninit_aligned {
 /// ```
 #[macro_export]
 macro_rules! space_zeroed_aligned {
-    (capacity: $capacity:expr, align: $align:expr $(,)?) => {{
+    (capacity: $capacity:expr, align: $align:literal $(,)?) => {{
         extern crate core;
 
         #[repr(C, align($align))]
@@ -519,7 +520,10 @@ macro_rules! space_zeroed_aligned {
             _contents: [u8; $capacity],
         }
 
-        core::mem::MaybeUninit::<Space>::zeroed()
+        unsafe {
+            core::mem::MaybeUninit::<[core::mem::MaybeUninit<Space>; 1]>::zeroed()
+                .assume_init()
+        }
     }};
 }
 
@@ -764,7 +768,7 @@ mod tests {
         {
             let mut space = space_uninit_aligned!(capacity: 32 * 4, align: 4);
             let space_ptr = &space as *const _;
-            let bump_into = BumpInto::from_single(&mut space);
+            let bump_into = BumpInto::from_slice(&mut space[..]);
 
             let (something4_ptr, something4_size) = bump_into.alloc_space_to_limit_for::<u32>();
             let something4_ptr = something4_ptr.as_ptr() as *const u32;
@@ -775,7 +779,7 @@ mod tests {
         {
             let mut space = space_zeroed_aligned!(capacity: 32 * 4, align: 4);
             let space_ptr = &space as *const _;
-            let bump_into = BumpInto::from_single(&mut space);
+            let bump_into = BumpInto::from_slice(&mut space[..]);
 
             let (something5_ptr, something5_size) = bump_into.alloc_space_to_limit_for::<u32>();
             let something5_ptr = something5_ptr.as_ptr() as *const u32;
