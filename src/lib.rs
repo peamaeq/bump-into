@@ -399,8 +399,9 @@ impl<'a> fmt::Debug for BumpInto<'a> {
 /// let mut space = space_uninit!(64);
 /// assert_eq!(mem::size_of_val(&space), 64);
 /// assert_eq!(mem::align_of_val(&space), 1);
-/// // you can also specify a type if you need your space to
-/// // have a particular alignment:
+/// // if you need your space to have the alignment of a
+/// // particular type, you can use an array-like syntax.
+/// // this line will create an array of MaybeUninit<u32>:
 /// let mut space = space_uninit!(u32; 16);
 /// assert_eq!(mem::size_of_val(&space), 64);
 /// assert_eq!(mem::align_of_val(&space), 4);
@@ -439,8 +440,9 @@ macro_rules! space_uninit {
 /// let mut space = space_zeroed!(64);
 /// assert_eq!(mem::size_of_val(&space), 64);
 /// assert_eq!(mem::align_of_val(&space), 1);
-/// // you can also specify a type if you need your space to
-/// // have a particular alignment:
+/// // if you need your space to have the alignment of a
+/// // particular type, you can use an array-like syntax.
+/// // this line will create an array of MaybeUninit<u32>:
 /// let mut space = space_zeroed!(u32; 16);
 /// assert_eq!(mem::size_of_val(&space), 64);
 /// assert_eq!(mem::align_of_val(&space), 4);
