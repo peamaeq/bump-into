@@ -52,6 +52,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     }
 
     /// Returns the number of bytes remaining in the allocator's space.
+    #[inline]
     pub fn available_bytes(&'this self) -> usize {
         unsafe { (*self.array.get()).len() }
     }
