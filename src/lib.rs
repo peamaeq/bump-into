@@ -469,9 +469,11 @@ macro_rules! space_zeroed {
 /// Creates an uninitialized array of one `MaybeUninit` without
 /// allocating, with the given capacity and alignment, suitable for
 /// taking a slice of to pass into `BumpInto::from_slice`.
+/// The capacity will be rounded up to the nearest multiple of the
+/// given alignment.
 ///
-/// The alignment given must be suitable for use as the parameter
-/// to repr(align), i.e. (as of Rust 1.46.0) an integer literal.
+/// The capacity must be a const expression of type `usize`.
+/// The alignment must be a power-of-two integer literal.
 ///
 /// # Examples
 ///
@@ -502,9 +504,11 @@ macro_rules! space_uninit_aligned {
 /// Creates a zeroed array of one `MaybeUninit` without allocating,
 /// with the given capacity and alignment, suitable for taking a slice
 /// of to pass into `BumpInto::from_slice`.
+/// The capacity will be rounded up to the nearest multiple of the
+/// given alignment.
 ///
-/// The alignment given must be suitable for use as the parameter
-/// to repr(align), i.e. (as of Rust 1.46.0) an integer literal.
+/// The capacity must be a const expression of type `usize`.
+/// The alignment must be a power-of-two integer literal.
 ///
 /// # Examples
 ///
