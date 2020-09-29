@@ -170,7 +170,8 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     /// Tries to allocate enough space to store a `T` and place `x` there.
     ///
     /// On success (i.e. if there was enough space) produces a mutable
-    /// reference to `x` with the lifetime of this `BumpInto`.
+    /// reference to `x` with the lifetime of this `BumpInto`'s backing
+    /// slice (`'a`).
     ///
     /// On failure, produces `x`.
     #[inline]
@@ -192,7 +193,8 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     /// of calling `f` there.
     ///
     /// On success (i.e. if there was enough space) produces a mutable
-    /// reference to the stored result with the lifetime of this `BumpInto`.
+    /// reference to the stored result with the lifetime of this
+    /// `BumpInto`'s backing slice (`'a`).
     ///
     /// On failure, produces `f`.
     pub fn alloc_with<T, F: FnOnce() -> T>(&'this self, f: F) -> Result<&'a mut T, F> {
@@ -221,7 +223,8 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     /// `xs` into it.
     ///
     /// On success (i.e. if there was enough space) produces a mutable
-    /// reference to the copy with the lifetime of this `BumpInto`.
+    /// reference to the copy with the lifetime of this `BumpInto`'s
+    /// backing slice (`'a`).
     #[inline]
     pub fn alloc_n<T: Copy>(&'this self, xs: &[T]) -> Option<&'a mut [T]> {
         let pointer = self.alloc_space(mem::size_of_val(xs), AlignOf::<T>::new()) as *mut T;
@@ -242,7 +245,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     ///
     /// On success (i.e. if there was enough space) produces a mutable
     /// reference to the stored results as a slice, with the lifetime of
-    /// this `BumpInto`.
+    /// this `BumpInto`'s backing slice (`'a`).
     ///
     /// On failure, produces `iter`.
     ///
@@ -290,7 +293,8 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     /// Allocates enough space to store as many of the values produced
     /// by `iter.into_iter()` as possible. Produces a mutable reference
     /// to the stored results as a slice, in the opposite order to the
-    /// order they were produced in, with the lifetime of this `BumpInto`.
+    /// order they were produced in, with the lifetime of this
+    /// `BumpInto`'s backing slice (`'a`).
     #[inline]
     pub fn alloc_down_with<T, I: IntoIterator<Item = T>>(&'this mut self, iter: I) -> &'a mut [T] {
         unsafe { self.alloc_down_with_shared(iter) }
