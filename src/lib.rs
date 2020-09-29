@@ -374,7 +374,7 @@ impl<'a> fmt::Debug for BumpInto<'a> {
 /// Creates an uninitialized array of `MaybeUninit` without allocating,
 /// suitable for taking a slice of to pass into `BumpInto::from_slice`.
 ///
-/// # Examples
+/// # Example
 ///
 /// ```rust
 /// use bump_into::space_uninit;
@@ -415,7 +415,7 @@ macro_rules! space_uninit {
 /// Creates a zeroed array of `MaybeUninit` without allocating,
 /// suitable for taking a slice of to pass into `BumpInto::from_slice`.
 ///
-/// # Examples
+/// # Example
 ///
 /// ```rust
 /// use bump_into::space_zeroed;
@@ -462,7 +462,7 @@ macro_rules! space_zeroed {
 /// The size must be a const expression of type `usize`.
 /// The alignment must be a power-of-two integer literal.
 ///
-/// # Examples
+/// # Example
 ///
 /// ```rust
 /// use bump_into::space_uninit_aligned;
@@ -497,7 +497,7 @@ macro_rules! space_uninit_aligned {
 /// The size must be a const expression of type `usize`.
 /// The alignment must be a power-of-two integer literal.
 ///
-/// # Examples
+/// # Example
 ///
 /// ```rust
 /// use bump_into::space_zeroed_aligned;
