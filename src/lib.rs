@@ -34,25 +34,6 @@ impl<'this, 'a: 'this> BumpInto<'a> {
         }
     }
 
-    /// Creates a new `BumpInto`, wrapping a single `MaybeUninit<S>`.
-    #[inline]
-    pub fn from_single<S>(single: &'a mut MaybeUninit<S>) -> Self {
-        let size = mem::size_of_val(single);
-        if size > isize::MAX as usize {
-            panic!(
-                "value passed into BumpInto::from_single is {} bytes, larger than isize::MAX",
-                size,
-            );
-        }
-
-        let ptr = single.as_mut_ptr() as *mut MaybeUninit<u8>;
-        let array = unsafe { core::slice::from_raw_parts_mut(ptr, size) };
-
-        BumpInto {
-            array: UnsafeCell::new(array),
-        }
-    }
-
     /// Returns the number of bytes remaining in the allocator's space.
     #[inline]
     pub fn available_bytes(&'this self) -> usize {
@@ -812,7 +793,7 @@ mod tests {
         let mut space = MaybeUninit::<u32>::uninit();
 
         {
-            let bump_into = BumpInto::from_single(&mut space);
+            let bump_into = BumpInto::from_slice(core::slice::from_mut(&mut space));
             let something1 = bump_into.alloc(0x8359u16).expect("allocation 1 failed");
             let something2 = bump_into.alloc(0x1312u16).expect("allocation 2 failed");
             assert_eq!(bump_into.available_bytes(), 0);
