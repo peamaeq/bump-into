@@ -1,6 +1,6 @@
 [package]
 name = "bump-into"
-version = "0.5.0"
+version = "0.5.1"
 edition = "2018"
 authors = ["Autumn <autumnontape@tutanota.com>"]
 description = "a no_std bump allocator over an arbitrary region of memory"
