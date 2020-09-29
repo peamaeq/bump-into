@@ -487,8 +487,7 @@ macro_rules! space_uninit_aligned {
         }
 
         unsafe {
-            core::mem::MaybeUninit::<[core::mem::MaybeUninit<Space>; 1]>::uninit()
-                .assume_init()
+            core::mem::MaybeUninit::<[core::mem::MaybeUninit<Space>; 1]>::uninit().assume_init()
         }
     }};
 }
@@ -521,8 +520,7 @@ macro_rules! space_zeroed_aligned {
         }
 
         unsafe {
-            core::mem::MaybeUninit::<[core::mem::MaybeUninit<Space>; 1]>::zeroed()
-                .assume_init()
+            core::mem::MaybeUninit::<[core::mem::MaybeUninit<Space>; 1]>::zeroed().assume_init()
         }
     }};
 }
