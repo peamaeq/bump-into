@@ -838,8 +838,8 @@ mod tests {
         let bump_into = BumpInto::from_slice(&mut bump_into_space[..]);
 
         // allocating an object produces a mutable reference with
-        // the same lifetime as the `BumpInto` instance, or `None`
-        // if there isn't enough space
+        // a lifetime borrowed from `bump_into_space`, or gives
+        // back its argument in `Err` if there isn't enough space
         let number: &mut u64 = bump_into.alloc_with(|| 123).ok().expect("not enough space");
         assert_eq!(*number, 123);
         *number = 50000;
