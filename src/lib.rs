@@ -16,6 +16,7 @@ pub struct BumpInto<'a> {
 
 impl<'this, 'a: 'this> BumpInto<'a> {
     /// Creates a new `BumpInto`, wrapping a slice of `MaybeUninit<S>`.
+    #[inline]
     pub fn from_slice<S>(array: &'a mut [MaybeUninit<S>]) -> Self {
         let size = mem::size_of_val(array);
         if size > isize::MAX as usize {
@@ -34,6 +35,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     }
 
     /// Creates a new `BumpInto`, wrapping a single `MaybeUninit<S>`.
+    #[inline]
     pub fn from_single<S>(single: &'a mut MaybeUninit<S>) -> Self {
         let size = mem::size_of_val(single);
         if size > isize::MAX as usize {
@@ -88,6 +90,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
 
     /// Returns the number of `T` that could be allocated in a
     /// contiguous region within the allocator's remaining space.
+    #[inline]
     pub fn available_spaces_for<T>(&'this self) -> usize {
         self.available_spaces(SizeOf::<T>::new(), AlignOf::<T>::new())
     }
@@ -151,6 +154,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     /// Tries to allocate enough space to store a `T`.
     /// Returns a properly aligned pointer to uninitialized `T` if
     /// there was enough space; otherwise returns a null pointer.
+    #[inline]
     pub fn alloc_space_for<T>(&'this self) -> *mut T {
         self.alloc_space(SizeOf::<T>::new(), AlignOf::<T>::new()) as *mut T
     }
@@ -188,6 +192,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     /// reference to `x` with the lifetime of this `BumpInto`.
     ///
     /// On failure, produces `x`.
+    #[inline]
     pub fn alloc<T>(&'this self, x: T) -> Result<&'a mut T, T> {
         let pointer = self.alloc_space_for::<T>();
 
@@ -236,6 +241,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     ///
     /// On success (i.e. if there was enough space) produces a mutable
     /// reference to the copy with the lifetime of this `BumpInto`.
+    #[inline]
     pub fn alloc_n<T: Copy>(&'this self, xs: &[T]) -> Option<&'a mut [T]> {
         let pointer = self.alloc_space(mem::size_of_val(xs), AlignOf::<T>::new()) as *mut T;
 
@@ -304,6 +310,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     /// by `iter.into_iter()` as possible. Produces a mutable reference
     /// to the stored results as a slice, in the opposite order to the
     /// order they were produced in, with the lifetime of this `BumpInto`.
+    #[inline]
     pub fn alloc_down_with<T, I: IntoIterator<Item = T>>(&'this mut self, iter: I) -> &'a mut [T] {
         unsafe { self.alloc_down_with_shared(iter) }
     }
