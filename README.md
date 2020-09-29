@@ -7,9 +7,9 @@
 [docs_rs_img]: https://docs.rs/bump-into/badge.svg
 [docs_rs_page]: https://docs.rs/bump-into
 
-A `no_std` bump allocator over an arbitrary region of memory. Can
-be used to pass objects up the stack when it would otherwise be
-inconvenient; for instance, if the objects are dynamically sized.
+A `no_std` bump allocator sourcing space from a user-provided mutable
+slice rather than from a global allocator, making it suitable for use
+in embedded applications and tight loops.
 
 ## Example
 

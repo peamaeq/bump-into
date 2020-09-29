@@ -9,7 +9,7 @@ use core::ptr::{self, NonNull};
 
 pub use size_align::{AlignOf, SizeOf};
 
-/// A bump allocator over an arbitrary region of memory.
+/// A bump allocator sourcing space from an `&mut MaybeUninit`.
 pub struct BumpInto<'a> {
     array: UnsafeCell<&'a mut [MaybeUninit<u8>]>,
 }
@@ -379,7 +379,7 @@ impl<'a> fmt::Debug for BumpInto<'a> {
     }
 }
 
-/// Creates an uninitialized array of `MaybeUninit` on the stack,
+/// Creates an uninitialized array of `MaybeUninit` without allocating,
 /// suitable for taking a slice of to pass into `BumpInto::from_slice`.
 ///
 /// # Examples
@@ -419,7 +419,7 @@ macro_rules! space_uninit {
     }};
 }
 
-/// Creates a zeroed array of `MaybeUninit` on the stack,
+/// Creates a zeroed array of `MaybeUninit` without allocating,
 /// suitable for taking a slice of to pass into `BumpInto::from_slice`.
 ///
 /// # Examples
@@ -459,9 +459,9 @@ macro_rules! space_zeroed {
     }};
 }
 
-/// Creates an uninitialized array of one `MaybeUninit` on the stack,
-/// with the given capacity and alignment, suitable for taking a slice
-/// of to pass into `BumpInto::from_slice`.
+/// Creates an uninitialized array of one `MaybeUninit` without
+/// allocating, with the given capacity and alignment, suitable for
+/// taking a slice of to pass into `BumpInto::from_slice`.
 ///
 /// The alignment given must be suitable for use as the parameter
 /// to repr(align), i.e. (as of Rust 1.46.0) an integer literal.
@@ -493,9 +493,9 @@ macro_rules! space_uninit_aligned {
     }};
 }
 
-/// Creates a zeroed array of one `MaybeUninit` on the stack, with the
-/// given capacity and alignment, suitable for taking a slice of to
-/// pass into `BumpInto::from_slice`.
+/// Creates a zeroed array of one `MaybeUninit` without allocating,
+/// with the given capacity and alignment, suitable for taking a slice
+/// of to pass into `BumpInto::from_slice`.
 ///
 /// The alignment given must be suitable for use as the parameter
 /// to repr(align), i.e. (as of Rust 1.46.0) an integer literal.
