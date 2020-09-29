@@ -18,6 +18,13 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     /// Creates a new `BumpInto`, wrapping a slice of `MaybeUninit<S>`.
     pub fn from_slice<S>(array: &'a mut [MaybeUninit<S>]) -> Self {
         let size = mem::size_of_val(array);
+        if size > isize::MAX as usize {
+            panic!(
+                "slice passed into BumpInto::from_slice is {} bytes, larger than isize::MAX",
+                size,
+            );
+        }
+
         let ptr = array as *mut [_] as *mut MaybeUninit<u8>;
         let array = unsafe { core::slice::from_raw_parts_mut(ptr, size) };
 
@@ -29,6 +36,13 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     /// Creates a new `BumpInto`, wrapping a single `MaybeUninit<S>`.
     pub fn from_single<S>(single: &'a mut MaybeUninit<S>) -> Self {
         let size = mem::size_of_val(single);
+        if size > isize::MAX as usize {
+            panic!(
+                "value passed into BumpInto::from_single is {} bytes, larger than isize::MAX",
+                size,
+            );
+        }
+
         let ptr = single.as_mut_ptr() as *mut MaybeUninit<u8>;
         let array = unsafe { core::slice::from_raw_parts_mut(ptr, size) };
 
@@ -67,13 +81,8 @@ impl<'this, 'a: 'this> BumpInto<'a> {
             return 0;
         }
 
-        let mut available_bytes = aligned_end - array_start;
-
-        if available_bytes > isize::max_value() as usize {
-            available_bytes = isize::max_value() as usize;
-        }
-
-        available_bytes / size
+        let usable_bytes = aligned_end - array_start;
+        usable_bytes / size
     }
 
     /// Returns the number of `T` that could be allocated in a
@@ -102,7 +111,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
             return align as *mut MaybeUninit<u8>;
         }
 
-        if size > isize::max_value() as usize {
+        if size > isize::MAX as usize {
             // Rust doesn't really support allocations this big,
             // and there's no way you'd want to put one in an
             // inline bump heap anyway. it's easier if we put
