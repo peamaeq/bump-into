@@ -1,3 +1,40 @@
+/*!
+
+A `no_std` bump allocator sourcing space from a user-provided mutable
+slice rather than from a global allocator, making it suitable for use
+in embedded applications and tight loops.
+
+## Example
+
+```rust
+use bump_into::{self, BumpInto};
+
+// allocate 64 bytes of uninitialized space on the stack
+let mut bump_into_space = bump_into::space_uninit!(64);
+let bump_into = BumpInto::from_slice(&mut bump_into_space[..]);
+
+// allocating an object produces a mutable reference with
+// a lifetime borrowed from `bump_into_space`, or gives
+// back its argument in `Err` if there isn't enough space
+let number: &mut u64 = bump_into
+    .alloc_with(|| 123)
+    .ok()
+    .expect("not enough space");
+assert_eq!(*number, 123);
+*number = 50000;
+assert_eq!(*number, 50000);
+
+// slices can be allocated as well
+let slice: &mut [u16] = bump_into
+    .alloc_n_with(5, core::iter::repeat(10))
+    .expect("not enough space");
+assert_eq!(slice, &[10; 5]);
+slice[2] = 100;
+assert_eq!(slice, &[10, 10, 100, 10, 10]);
+```
+
+*/
+
 #![no_std]
 
 mod size_align;
@@ -9,7 +46,12 @@ use core::ptr::{self, NonNull};
 
 pub use size_align::{AlignOf, SizeOf};
 
-/// A bump allocator sourcing space from an `&mut MaybeUninit`.
+/// A bump allocator sourcing space from an `&mut [MaybeUninit]`.
+///
+/// Allocation methods produce mutable references with lifetimes
+/// tied to the lifetime of the backing slice, meaning the
+/// `BumpInto` itself can be freely moved around, including
+/// between threads.
 pub struct BumpInto<'a> {
     array: UnsafeCell<&'a mut [MaybeUninit<u8>]>,
 }
@@ -825,28 +867,5 @@ mod tests {
         core::mem::drop(bump_into);
 
         assert_eq!(*something1, 123u64);
-    }
-
-    #[test]
-    fn readme_example() {
-        // allocate 64 bytes of uninitialized space on the stack
-        let mut bump_into_space = space_uninit!(64);
-        let bump_into = BumpInto::from_slice(&mut bump_into_space[..]);
-
-        // allocating an object produces a mutable reference with
-        // a lifetime borrowed from `bump_into_space`, or gives
-        // back its argument in `Err` if there isn't enough space
-        let number: &mut u64 = bump_into.alloc_with(|| 123).ok().expect("not enough space");
-        assert_eq!(*number, 123);
-        *number = 50000;
-        assert_eq!(*number, 50000);
-
-        // slices can be allocated as well
-        let slice: &mut [u16] = bump_into
-            .alloc_n_with(5, core::iter::repeat(10))
-            .expect("not enough space");
-        assert_eq!(slice, &[10; 5]);
-        slice[2] = 100;
-        assert_eq!(slice, &[10, 10, 100, 10, 10]);
     }
 }
