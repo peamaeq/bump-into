@@ -1,6 +1,6 @@
 [package]
 name = "bump-into"
-version = "0.5.2"
+version = "0.6.0"
 edition = "2018"
 authors = ["Autumn <autumnontape@tutanota.com>"]
 description = "a no_std bump allocator sourcing space from a user-provided slice"
