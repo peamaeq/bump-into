@@ -907,18 +907,21 @@ mod tests {
 
             let mut something4: Option<&mut [u32]> = None;
             let something3: &mut [u32] = bump_into
-                .alloc_n_with(4, core::iter::from_fn(|| {
-                    let inner_something = bump_into
-                        .alloc_n_with(bump_into.available_spaces_for::<u32>() / 2 + 1, 0u32..);
+                .alloc_n_with(
+                    4,
+                    core::iter::from_fn(|| {
+                        let inner_something = bump_into
+                            .alloc_n_with(bump_into.available_spaces_for::<u32>() / 2 + 1, 0u32..);
 
-                    inner_something.ok().map(|inner_something| {
-                        let something3 = inner_something.iter().sum();
+                        inner_something.ok().map(|inner_something| {
+                            let something3 = inner_something.iter().sum();
 
-                        something4 = Some(inner_something);
+                            something4 = Some(inner_something);
 
-                        something3
-                    })
-                }))
+                            something3
+                        })
+                    }),
+                )
                 .ok()
                 .expect("allocation 3 failed");
 
