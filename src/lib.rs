@@ -868,4 +868,56 @@ mod tests {
 
         assert_eq!(*something1, 123u64);
     }
+
+    #[test]
+    fn alloc_inside_alloc_with() {
+        let mut space = space_uninit!(u32; 8);
+
+        {
+            let bump_into = BumpInto::from_slice(&mut space[..]);
+
+            let mut something2: Option<&mut [u32]> = None;
+            let something1: &mut u32 = bump_into
+                .alloc_with(|| {
+                    let inner_something = bump_into
+                        .alloc_n_with(bump_into.available_spaces_for::<u32>(), 0u32..)
+                        .expect("inner allocation failed");
+
+                    let something1 = inner_something.iter().sum();
+
+                    something2 = Some(inner_something);
+
+                    something1
+                })
+                .ok()
+                .expect("allocation 1 failed");
+
+            assert_eq!(*something1, (0..7).sum());
+            assert_eq!(something2, Some(&mut [0, 1, 2, 3, 4, 5, 6][..]));
+        }
+
+        {
+            let bump_into = BumpInto::from_slice(&mut space[..]);
+
+            let mut something4: Option<&mut [u32]> = None;
+            let something3: &mut [u32] = bump_into
+                .alloc_n_with(4, core::iter::from_fn(|| {
+                    let inner_something = bump_into
+                        .alloc_n_with(bump_into.available_spaces_for::<u32>() / 2 + 1, 0u32..);
+
+                    inner_something.ok().map(|inner_something| {
+                        let something3 = inner_something.iter().sum();
+
+                        something4 = Some(inner_something);
+
+                        something3
+                    })
+                }))
+                .ok()
+                .expect("allocation 3 failed");
+
+            assert_eq!(something3, &mut [(0..3).sum(), 0]);
+            assert_eq!(something4, Some(&mut [0][..]));
+        }
+    }
 }
