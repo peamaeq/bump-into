@@ -239,6 +239,9 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     /// `BumpInto`'s backing slice (`'a`).
     ///
     /// On failure, produces `f`.
+    ///
+    /// Allocating within `f` is allowed; `f` is only called after the
+    /// initial allocation succeeds.
     pub fn alloc_with<T, F: FnOnce() -> T>(&'this self, f: F) -> Result<&'a mut T, F> {
         #[inline(always)]
         unsafe fn eval_and_write<T, F: FnOnce() -> T>(pointer: *mut T, f: F) {
@@ -295,6 +298,9 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     /// allocated space, the same amount of space is allocated, but the
     /// returned slice is just long enough to hold the items that were
     /// actually produced.
+    ///
+    /// Allocating within the iterator's `next` method is allowed;
+    /// iteration only begins after the initial allocation succeeds.
     pub fn alloc_n_with<T, I: IntoIterator<Item = T>>(
         &'this self,
         count: usize,
