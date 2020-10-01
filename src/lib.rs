@@ -78,6 +78,12 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     /// Returns the number of spaces of size `size` that could be
     /// allocated in a contiguous region ending at alignment `align`
     /// within the allocator's remaining space.
+    ///
+    /// Returns `usize::MAX` if `size` is zero.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `align` is zero.
     pub fn available_spaces<S: Into<usize>, A: Into<usize>>(
         &'this self,
         size: S,
@@ -110,6 +116,8 @@ impl<'this, 'a: 'this> BumpInto<'a> {
 
     /// Returns the number of `T` that could be allocated in a
     /// contiguous region within the allocator's remaining space.
+    ///
+    /// Returns `usize::MAX` if `T` is a zero-sized type.
     #[inline]
     pub fn available_spaces_for<T>(&'this self) -> usize {
         self.available_spaces(SizeOf::<T>::new(), AlignOf::<T>::new())
@@ -117,6 +125,10 @@ impl<'this, 'a: 'this> BumpInto<'a> {
 
     /// Tries to allocate `size` bytes with alignment `align`.
     /// Returns a null pointer on failure.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `align` is zero.
     pub fn alloc_space<S: Into<usize>, A: Into<usize>>(
         &'this self,
         size: S,
@@ -195,6 +207,9 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     /// free space of this `BumpInto`. Returns a tuple holding a
     /// pointer to the lowest `T`-space that was just allocated and
     /// the count of `T` that will fit (which may be zero).
+    ///
+    /// This method will unconditionally succeed if `T` is a
+    /// zero-sized type, with the count returned being `usize::MAX`.
     pub fn alloc_space_to_limit_for<T>(&'this self) -> (NonNull<T>, usize) {
         let count = self.available_spaces(SizeOf::<T>::new(), AlignOf::<T>::new());
 
@@ -340,6 +355,11 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     /// to the stored results as a slice, in the opposite order to the
     /// order they were produced in, with the lifetime of this
     /// `BumpInto`'s backing slice (`'a`).
+    ///
+    /// This method will create a slice of up to `usize::MAX` elements
+    /// if `T` is a zero-sized type. This means it technically will not
+    /// try to exhaust an infinite iterator, but it may still take much
+    /// longer than expected in generic code!
     #[inline]
     pub fn alloc_down_with<T, I: IntoIterator<Item = T>>(&'this mut self, iter: I) -> &'a mut [T] {
         unsafe { self.alloc_down_with_shared(iter) }
