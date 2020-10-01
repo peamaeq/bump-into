@@ -504,6 +504,7 @@ macro_rules! space_zeroed {
 /// Creates an uninitialized array of one `MaybeUninit` without
 /// allocating, with the given size and alignment, suitable for
 /// taking a slice of to pass into `BumpInto::from_slice`.
+///
 /// The size will be rounded up to the nearest multiple of the
 /// given alignment.
 ///
@@ -539,6 +540,7 @@ macro_rules! space_uninit_aligned {
 /// Creates a zeroed array of one `MaybeUninit` without allocating,
 /// with the given size and alignment, suitable for taking a slice
 /// of to pass into `BumpInto::from_slice`.
+///
 /// The size will be rounded up to the nearest multiple of the
 /// given alignment.
 ///
