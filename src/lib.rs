@@ -61,13 +61,6 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     #[inline]
     pub fn from_slice<S>(array: &'a mut [MaybeUninit<S>]) -> Self {
         let size = mem::size_of_val(array);
-        if size > isize::MAX as usize {
-            panic!(
-                "slice passed into BumpInto::from_slice is {} bytes, larger than isize::MAX",
-                size,
-            );
-        }
-
         let ptr = array as *mut [_] as *mut MaybeUninit<u8>;
         let array = unsafe { core::slice::from_raw_parts_mut(ptr, size) };
 
