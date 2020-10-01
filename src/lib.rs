@@ -360,13 +360,21 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     /// if `T` is a zero-sized type. This means it technically will not
     /// try to exhaust an infinite iterator, but it may still take much
     /// longer than expected in generic code!
+    ///
+    /// If you have only a shared reference, and especially if you must
+    /// call *non-allocating* methods of `self` within the iterator,
+    /// you can use the unsafe [`alloc_down_with_shared`].
+    ///
+    /// [`alloc_down_with_shared`]: #method.alloc_down_with_shared
     #[inline]
     pub fn alloc_down_with<T, I: IntoIterator<Item = T>>(&'this mut self, iter: I) -> &'a mut [T] {
         unsafe { self.alloc_down_with_shared(iter) }
     }
 
-    /// Unsafe version of `alloc_down_with`, taking `self` as a shared
-    /// reference instead of a mutable reference.
+    /// Unsafe version of [`alloc_down_with`], taking `self` as a
+    /// shared reference instead of a mutable reference.
+    ///
+    /// [`alloc_down_with`]: #method.alloc_down_with
     ///
     /// # Safety
     ///
