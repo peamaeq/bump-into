@@ -195,6 +195,10 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     /// Returns a properly aligned pointer to uninitialized `T` if
     /// there was enough space; otherwise returns a null pointer.
     pub fn alloc_space_for_n<T>(&'this self, count: usize) -> *mut T {
+        if mem::size_of::<T>() == 0 {
+            return NonNull::dangling().as_ptr();
+        }
+
         let size = mem::size_of::<T>().checked_mul(count);
 
         match size {
@@ -211,6 +215,10 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     /// This method will unconditionally succeed if `T` is a
     /// zero-sized type, with the count returned being `usize::MAX`.
     pub fn alloc_space_to_limit_for<T>(&'this self) -> (NonNull<T>, usize) {
+        if mem::size_of::<T>() == 0 {
+            return (NonNull::dangling(), usize::MAX);
+        }
+
         let count = self.available_spaces(SizeOf::<T>::new(), AlignOf::<T>::new());
 
         let pointer = self.alloc_space(count * mem::size_of::<T>(), AlignOf::<T>::new());
@@ -284,6 +292,15 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     /// backing slice (`'a`).
     #[inline]
     pub fn alloc_n<T: Copy>(&'this self, xs: &[T]) -> Option<&'a mut [T]> {
+        if mem::size_of::<T>() == 0 {
+            unsafe {
+                return Some(core::slice::from_raw_parts_mut(
+                    NonNull::dangling().as_ptr(),
+                    xs.len(),
+                ));
+            }
+        }
+
         let pointer = self.alloc_space(mem::size_of_val(xs), AlignOf::<T>::new()) as *mut T;
 
         if pointer.is_null() {
