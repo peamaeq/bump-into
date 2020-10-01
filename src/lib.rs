@@ -97,6 +97,10 @@ impl<'this, 'a: 'this> BumpInto<'a> {
             panic!("alignment must not be zero");
         }
 
+        if size == 0 {
+            return usize::MAX;
+        }
+
         let array = unsafe { &mut *self.array.get() };
 
         let array_start = *array as *mut [MaybeUninit<u8>] as *mut MaybeUninit<u8> as usize;
