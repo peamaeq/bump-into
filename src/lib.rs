@@ -365,6 +365,18 @@ impl<'this, 'a: 'this> BumpInto<'a> {
         &'this self,
         iter: I,
     ) -> &'a mut [T] {
+        if mem::size_of::<T>() == 0 {
+            // this is both meant as an optimization and to bypass
+            // the `aligned_end <= array_start` check, since
+            // allocating ZSTs shouldn't depend on alignment or
+            // remaining space.
+            // we also enforce here that an allocation have no more
+            // than `usize::MAX` objects, which is obviously implicit
+            // on the positive-size path.
+            let count = iter.into_iter().take(usize::MAX).map(mem::forget).count();
+            return core::slice::from_raw_parts_mut(NonNull::dangling().as_ptr(), count);
+        }
+
         let (array_start, current_end) = {
             let array = &mut *self.array.get();
 
