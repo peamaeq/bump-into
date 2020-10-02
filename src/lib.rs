@@ -56,7 +56,7 @@ pub struct BumpInto<'a> {
     array: UnsafeCell<&'a mut [MaybeUninit<u8>]>,
 }
 
-impl<'this, 'a: 'this> BumpInto<'a> {
+impl<'a> BumpInto<'a> {
     /// Creates a new `BumpInto`, wrapping a slice of `MaybeUninit<S>`.
     #[inline]
     pub fn from_slice<S>(array: &'a mut [MaybeUninit<S>]) -> Self {
@@ -71,7 +71,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
 
     /// Returns the number of bytes remaining in the allocator's space.
     #[inline]
-    pub fn available_bytes(&'this self) -> usize {
+    pub fn available_bytes(&self) -> usize {
         unsafe { (*self.array.get()).len() }
     }
 
@@ -84,11 +84,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     /// # Panics
     ///
     /// Panics if `align` is zero.
-    pub fn available_spaces<S: Into<usize>, A: Into<usize>>(
-        &'this self,
-        size: S,
-        align: A,
-    ) -> usize {
+    pub fn available_spaces<S: Into<usize>, A: Into<usize>>(&self, size: S, align: A) -> usize {
         let size = size.into();
         let align = align.into();
 
@@ -119,7 +115,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     ///
     /// Returns `usize::MAX` if `T` is a zero-sized type.
     #[inline]
-    pub fn available_spaces_for<T>(&'this self) -> usize {
+    pub fn available_spaces_for<T>(&self) -> usize {
         self.available_spaces(SizeOf::<T>::new(), AlignOf::<T>::new())
     }
 
@@ -130,7 +126,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     ///
     /// Panics if `align` is zero.
     pub fn alloc_space<S: Into<usize>, A: Into<usize>>(
-        &'this self,
+        &self,
         size: S,
         align: A,
     ) -> *mut MaybeUninit<u8> {
@@ -187,14 +183,14 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     /// Returns a properly aligned pointer to uninitialized `T` if
     /// there was enough space; otherwise returns a null pointer.
     #[inline]
-    pub fn alloc_space_for<T>(&'this self) -> *mut T {
+    pub fn alloc_space_for<T>(&self) -> *mut T {
         self.alloc_space(SizeOf::<T>::new(), AlignOf::<T>::new()) as *mut T
     }
 
     /// Tries to allocate enough space to store `count` number of `T`.
     /// Returns a properly aligned pointer to uninitialized `T` if
     /// there was enough space; otherwise returns a null pointer.
-    pub fn alloc_space_for_n<T>(&'this self, count: usize) -> *mut T {
+    pub fn alloc_space_for_n<T>(&self, count: usize) -> *mut T {
         if mem::size_of::<T>() == 0 {
             return NonNull::dangling().as_ptr();
         }
@@ -214,7 +210,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     ///
     /// This method will unconditionally succeed if `T` is a
     /// zero-sized type, with the count returned being `usize::MAX`.
-    pub fn alloc_space_to_limit_for<T>(&'this self) -> (NonNull<T>, usize) {
+    pub fn alloc_space_to_limit_for<T>(&self) -> (NonNull<T>, usize) {
         if mem::size_of::<T>() == 0 {
             return (NonNull::dangling(), usize::MAX);
         }
@@ -237,7 +233,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     ///
     /// On failure, produces `x`.
     #[inline]
-    pub fn alloc<T>(&'this self, x: T) -> Result<&'a mut T, T> {
+    pub fn alloc<T>(&self, x: T) -> Result<&'a mut T, T> {
         let pointer = self.alloc_space_for::<T>();
 
         if pointer.is_null() {
@@ -262,7 +258,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     ///
     /// Allocating within `f` is allowed; `f` is only called after the
     /// initial allocation succeeds.
-    pub fn alloc_with<T, F: FnOnce() -> T>(&'this self, f: F) -> Result<&'a mut T, F> {
+    pub fn alloc_with<T, F: FnOnce() -> T>(&self, f: F) -> Result<&'a mut T, F> {
         #[inline(always)]
         unsafe fn eval_and_write<T, F: FnOnce() -> T>(pointer: *mut T, f: F) {
             // this is an optimization borrowed from bumpalo by fitzgen
@@ -291,7 +287,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     /// reference to the copy with the lifetime of this `BumpInto`'s
     /// backing slice (`'a`).
     #[inline]
-    pub fn alloc_n<T: Copy>(&'this self, xs: &[T]) -> Option<&'a mut [T]> {
+    pub fn alloc_n<T: Copy>(&self, xs: &[T]) -> Option<&'a mut [T]> {
         if mem::size_of::<T>() == 0 {
             unsafe {
                 return Some(core::slice::from_raw_parts_mut(
@@ -331,7 +327,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     /// Allocating within the iterator's `next` method is allowed;
     /// iteration only begins after the initial allocation succeeds.
     pub fn alloc_n_with<T, I: IntoIterator<Item = T>>(
-        &'this self,
+        &self,
         count: usize,
         iter: I,
     ) -> Result<&'a mut [T], I> {
@@ -384,7 +380,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     ///
     /// [`alloc_down_with_shared`]: #method.alloc_down_with_shared
     #[inline]
-    pub fn alloc_down_with<T, I: IntoIterator<Item = T>>(&'this mut self, iter: I) -> &'a mut [T] {
+    pub fn alloc_down_with<T, I: IntoIterator<Item = T>>(&mut self, iter: I) -> &'a mut [T] {
         unsafe { self.alloc_down_with_shared(iter) }
     }
 
@@ -400,7 +396,7 @@ impl<'this, 'a: 'this> BumpInto<'a> {
     /// the exception of the `available_bytes`, `available_spaces`,
     /// and `available_spaces_for` methods, which are safe.
     pub unsafe fn alloc_down_with_shared<T, I: IntoIterator<Item = T>>(
-        &'this self,
+        &self,
         iter: I,
     ) -> &'a mut [T] {
         if mem::size_of::<T>() == 0 {
