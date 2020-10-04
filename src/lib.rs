@@ -1027,6 +1027,12 @@ mod tests {
                 .alloc_down_with_shared(core::iter::from_fn(|| Some(ZstWithDrop)).take(big_number))
         };
         assert_eq!(nothing6.len(), big_number);
+
+        let nothing7_array = [(); usize::MAX];
+        let nothing7 = bump_into
+            .alloc_slice(&nothing7_array)
+            .expect("allocation 7 failed");
+        assert_eq!(nothing7.len(), usize::MAX);
     }
 
     #[test]
