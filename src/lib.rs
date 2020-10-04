@@ -208,8 +208,8 @@ impl<'a> BumpInto<'a> {
     /// pointer to the lowest `T`-space that was just allocated and
     /// the count of `T` that will fit (which may be zero).
     ///
-    /// This method will unconditionally succeed if `T` is a
-    /// zero-sized type, with the count returned being `usize::MAX`.
+    /// This method will produce a count of `usize::MAX` if `T` is
+    /// a zero-sized type.
     pub fn alloc_space_to_limit_for<T>(&self) -> (NonNull<T>, usize) {
         if mem::size_of::<T>() == 0 {
             return (NonNull::dangling(), usize::MAX);
