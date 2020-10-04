@@ -287,7 +287,7 @@ impl<'a> BumpInto<'a> {
     /// reference to the copy with the lifetime of this `BumpInto`'s
     /// backing slice (`'a`).
     #[inline]
-    pub fn alloc_n<T: Copy>(&self, xs: &[T]) -> Option<&'a mut [T]> {
+    pub fn alloc_slice<T: Copy>(&self, xs: &[T]) -> Option<&'a mut [T]> {
         if mem::size_of::<T>() == 0 {
             unsafe {
                 return Some(core::slice::from_raw_parts_mut(
@@ -668,13 +668,13 @@ mod tests {
         let bump_into = BumpInto::from_slice(&mut space[..]);
 
         let something1 = bump_into
-            .alloc_n(&[1u32, 258909, 1000][..])
+            .alloc_slice(&[1u32, 258909, 1000][..])
             .expect("allocation 1 failed");
 
         assert_eq!(something1, &[1u32, 258909, 1000][..]);
 
         let something2 = bump_into
-            .alloc_n(&[1u64, 258909, 1000, 0][..])
+            .alloc_slice(&[1u64, 258909, 1000, 0][..])
             .expect("allocation 2 failed");
 
         assert_eq!(something1, &[1u32, 258909, 1000][..]);
@@ -1013,7 +1013,7 @@ mod tests {
             .expect("allocation 3 failed");
 
         let nothing4 = bump_into
-            .alloc_n(&[(), (), (), ()])
+            .alloc_slice(&[(), (), (), ()])
             .expect("allocation 4 failed");
         assert_eq!(nothing4, &[(), (), (), ()]);
 
