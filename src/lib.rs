@@ -407,6 +407,7 @@ impl<'a> BumpInto<'a> {
             // we also enforce here that an allocation have no more
             // than `usize::MAX` objects, which is obviously implicit
             // on the positive-size path.
+            #[allow(clippy::suspicious_map)]
             let count = iter.into_iter().take(usize::MAX).map(mem::forget).count();
             return core::slice::from_raw_parts_mut(NonNull::dangling().as_ptr(), count);
         }
