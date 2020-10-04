@@ -981,4 +981,78 @@ mod tests {
             assert_eq!(something4, Some(&mut [0][..]));
         }
     }
+
+    #[derive(Debug)]
+    struct ZstWithDrop;
+
+    impl Drop for ZstWithDrop {
+        fn drop(&mut self) {
+            panic!("ZstWithDrop was dropped!");
+        }
+    }
+
+    fn zero_sized(space: &mut [MaybeUninit<u8>]) {
+        let big_number = if cfg!(miri) { 0x100 } else { 0x10000 };
+
+        let space_len = space.len();
+        let bump_into = BumpInto::from_slice(space);
+
+        assert_eq!(bump_into.available_bytes(), space_len);
+        assert_eq!(bump_into.available_spaces(0usize, 0x100usize), usize::MAX);
+        assert_eq!(bump_into.available_spaces_for::<ZstWithDrop>(), usize::MAX);
+
+        let (nothing1_ptr, nothing1_count) = bump_into.alloc_space_to_limit_for::<ZstWithDrop>();
+        assert!(!nothing1_ptr.as_ptr().is_null());
+        assert_eq!(nothing1_count, usize::MAX);
+
+        let _nothing2 = bump_into.alloc(ZstWithDrop).expect("allocation 2 failed");
+
+        let _nothing3 = bump_into
+            .alloc_with(|| ZstWithDrop)
+            .ok()
+            .expect("allocation 3 failed");
+
+        let nothing4 = bump_into
+            .alloc_n(&[(), (), (), ()])
+            .expect("allocation 4 failed");
+        assert_eq!(nothing4, &[(), (), (), ()]);
+
+        let nothing5 = bump_into
+            .alloc_n_with(big_number, core::iter::from_fn(|| Some(ZstWithDrop)))
+            .expect("allocation 5 failed");
+        assert_eq!(nothing5.len(), big_number);
+
+        let nothing6 = unsafe {
+            bump_into
+                .alloc_down_with_shared(core::iter::from_fn(|| Some(ZstWithDrop)).take(big_number))
+        };
+        assert_eq!(nothing6.len(), big_number);
+    }
+
+    #[test]
+    fn zero_sized_0_space() {
+        let mut space = space_uninit!(0);
+        zero_sized(&mut space[..]);
+    }
+
+    #[test]
+    fn zero_sized_32_space() {
+        let mut space = space_uninit!(32);
+        zero_sized(&mut space[..]);
+    }
+
+    #[test]
+    #[ignore = "hangs when optimizations are off"]
+    fn zero_sized_usize_max() {
+        let mut space = space_uninit!(0);
+        let mut bump_into = BumpInto::from_slice(&mut space[..]);
+
+        let nothing1 = bump_into
+            .alloc_n_with(usize::MAX, core::iter::from_fn(|| Some(ZstWithDrop)))
+            .expect("allocation 1 failed");
+        assert_eq!(nothing1.len(), usize::MAX);
+
+        let nothing2 = bump_into.alloc_down_with(core::iter::from_fn(|| Some(ZstWithDrop)));
+        assert_eq!(nothing2.len(), usize::MAX);
+    }
 }
