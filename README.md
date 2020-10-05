@@ -1,13 +1,13 @@
 # bump-into
 
-[![CI status][ci_status_img]][ci_status_page] [![crates.io][crates_io_img]][crates_io_page] [![docs.rs][docs_rs_img]][docs_rs_page]
+[![crates.io][crates_io_img]][crates_io_page] [![docs.rs][docs_rs_img]][docs_rs_page] [![CI status][ci_status_img]][ci_status_page]
 
-[ci_status_img]: https://img.shields.io/github/workflow/status/autumnontape/bump-into/CI
-[ci_status_page]: https://github.com/autumnontape/bump-into/actions
 [crates_io_img]: https://img.shields.io/crates/v/bump-into.svg
 [crates_io_page]: https://crates.io/crates/bump-into
 [docs_rs_img]: https://docs.rs/bump-into/badge.svg
 [docs_rs_page]: https://docs.rs/bump-into
+[ci_status_img]: https://img.shields.io/github/workflow/status/autumnontape/bump-into/CI
+[ci_status_page]: https://github.com/autumnontape/bump-into/actions
 
 A `no_std` bump allocator sourcing space from a user-provided mutable
 slice rather than from a global allocator, making it suitable for use
