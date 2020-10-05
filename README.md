@@ -16,8 +16,10 @@ in embedded applications and tight loops.
 ## Drop behavior
 
 Values held in `BumpInto` allocations are never dropped. If they must
-be dropped, you can use `Option::take`, `core::mem::ManuallyDrop::drop`,
-or `core::ptr::drop_in_place` to drop them explicitly.
+be dropped, you can use `core::mem::ManuallyDrop::drop` or
+`core::ptr::drop_in_place` to drop them explicitly (and unsafely).
+In safe code, you can allocate an `Option` and drop the value inside
+by overwriting it with `None`.
 
 ## Example
 
