@@ -47,9 +47,12 @@ assert_eq!(slice, &[10, 10, 100, 10, 10]);
 
 mod size_align;
 
+use core::any::Any;
 use core::cell::UnsafeCell;
 use core::fmt;
-use core::mem::{self, MaybeUninit};
+use core::mem::{self, ManuallyDrop, MaybeUninit};
+use core::ops::{Deref, DerefMut};
+use core::pin::Pin;
 use core::ptr::{self, NonNull};
 
 pub use size_align::{AlignOf, SizeOf};
@@ -69,6 +72,10 @@ pub use size_align::{AlignOf, SizeOf};
 /// it with `None`.
 pub struct BumpInto<'a> {
     array: UnsafeCell<&'a mut [MaybeUninit<u8>]>,
+}
+
+pub struct Box<'a, T: ?Sized> {
+    value: &'a mut ManuallyDrop<T>,
 }
 
 impl<'a> BumpInto<'a> {
@@ -295,6 +302,25 @@ impl<'a> BumpInto<'a> {
         }
     }
 
+    #[inline]
+    pub fn boxed<T>(&self, x: T) -> Result<Box<'a, T>, T> {
+        match self.alloc(ManuallyDrop::new(x)) {
+            Ok(value) => Ok(Box { value }),
+            Err(value) => Err(ManuallyDrop::into_inner(value)),
+        }
+    }
+
+    #[inline]
+    pub fn boxed_with<T, F: FnOnce() -> T>(&self, f: F) -> Result<Box<'a, T>, F> {
+        // this is sound because `ManuallyDrop` is repr(transparent).
+        // the non-trivial boxed allocating functions all work this way.
+        unsafe {
+            self.alloc_with(f).map(|value| Box {
+                value: &mut *(value as *mut T as *mut ManuallyDrop<T>),
+            })
+        }
+    }
+
     /// Tries to allocate enough space to store a copy of `xs` and copy
     /// `xs` into it.
     ///
@@ -375,6 +401,30 @@ impl<'a> BumpInto<'a> {
             }
 
             Ok(core::slice::from_raw_parts_mut(pointer, count))
+        }
+    }
+
+    #[inline]
+    pub fn boxed_slice<T: Copy>(&self, xs: &[T]) -> Option<Box<'a, [T]>> {
+        // this is sound because `ManuallyDrop` is repr(transparent).
+        unsafe {
+            self.alloc_slice(xs).map(|value| Box {
+                value: &mut *(value as *mut [T] as *mut ManuallyDrop<[T]>),
+            })
+        }
+    }
+
+    #[inline]
+    pub fn boxed_n_with<T, I: IntoIterator<Item = T>>(
+        &self,
+        count: usize,
+        iter: I,
+    ) -> Result<Box<'a, [T]>, I> {
+        // this is sound because `ManuallyDrop` is repr(transparent).
+        unsafe {
+            self.alloc_n_with(count, iter).map(|value| Box {
+                value: &mut *(value as *mut [T] as *mut ManuallyDrop<[T]>),
+            })
         }
     }
 
@@ -477,11 +527,106 @@ impl<'a> BumpInto<'a> {
             count += 1;
         }
     }
+
+    #[inline]
+    pub fn boxed_down_with<T, I: IntoIterator<Item = T>>(&mut self, iter: I) -> Box<'a, [T]> {
+        // this is sound because `ManuallyDrop` is repr(transparent).
+        unsafe {
+            let value = self.alloc_down_with(iter);
+            Box {
+                value: &mut *(value as *mut [T] as *mut ManuallyDrop<[T]>),
+            }
+        }
+    }
+
+    #[inline]
+    pub fn boxed_down_with_shared<T, I: IntoIterator<Item = T>>(&mut self, iter: I) -> Box<'a, [T]> {
+        // this is sound because `ManuallyDrop` is repr(transparent).
+        unsafe {
+            let value = self.alloc_down_with_shared(iter);
+            Box {
+                value: &mut *(value as *mut [T] as *mut ManuallyDrop<[T]>),
+            }
+        }
+    }
 }
 
 impl<'a> fmt::Debug for BumpInto<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "BumpInto {{ {} bytes free }}", self.available_bytes())
+    }
+}
+
+impl<'a, T: ?Sized> Box<'a, T> {
+    #[inline]
+    pub fn leak(b: Self) -> &'a mut T {
+        &mut *Box::leak_manually_drop(b)
+    }
+
+    #[inline]
+    pub fn leak_manually_drop(b: Self) -> &'a mut ManuallyDrop<T> {
+        unsafe { &mut *(ManuallyDrop::new(b).value as *mut ManuallyDrop<T>) }
+    }
+
+    #[inline]
+    pub fn into_pin(b: Self) -> Pin<Self> {
+        unsafe {
+            Pin::new_unchecked(b)
+        }
+    }
+}
+
+impl<'a> Box<'a, dyn Any> {
+    #[inline]
+    pub fn downcast<T: Any>(self) -> Result<Box<'a, T>, Box<'a, dyn Any>> {
+        if self.is::<T>() {
+            unsafe {
+                let raw = self.value as *mut ManuallyDrop<dyn Any>;
+                Ok(Box {
+                    value: &mut *(raw as *mut ManuallyDrop<T>),
+                })
+            }
+        } else {
+            Err(self)
+        }
+    }
+}
+
+impl<'a> Box<'a, dyn Any + Send> {
+    #[inline]
+    pub fn downcast<T: Any>(self) -> Result<Box<'a, T>, Box<'a, dyn Any + Send>> {
+        if self.is::<T>() {
+            unsafe {
+                let raw = self.value as *mut ManuallyDrop<dyn Any + Send>;
+                Ok(Box {
+                    value: &mut *(raw as *mut ManuallyDrop<T>),
+                })
+            }
+        } else {
+            Err(self)
+        }
+    }
+}
+
+impl<'a, T: ?Sized> Deref for Box<'a, T> {
+    type Target = T;
+
+    fn deref(&self) -> &T {
+        &*self.value
+    }
+}
+
+impl<'a, T: ?Sized> DerefMut for Box<'a, T> {
+    fn deref_mut(&mut self) -> &mut T {
+        &mut *self.value
+    }
+}
+
+impl<T: ?Sized> Drop for Box<'_, T> {
+    fn drop(&mut self) {
+        unsafe {
+            ManuallyDrop::drop(self.value)
+        }
     }
 }
 
