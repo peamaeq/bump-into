@@ -13,6 +13,12 @@ A `no_std` bump allocator sourcing space from a user-provided mutable
 slice rather than from a global allocator, making it suitable for use
 in embedded applications and tight loops.
 
+## Drop behavior
+
+Values held in `BumpInto` allocations are never dropped. If they must
+be dropped, you can use `Option::take`, `core::mem::ManuallyDrop::drop`,
+or `core::ptr::drop_in_place` to drop them explicitly.
+
 ## Example
 
 ```rust

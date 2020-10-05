@@ -4,6 +4,12 @@ A `no_std` bump allocator sourcing space from a user-provided mutable
 slice rather than from a global allocator, making it suitable for use
 in embedded applications and tight loops.
 
+## Drop behavior
+
+Values held in `BumpInto` allocations are never dropped. If they must
+be dropped, you can use `Option::take`, `core::mem::ManuallyDrop::drop`,
+or `core::ptr::drop_in_place` to drop them explicitly.
+
 ## Example
 
 ```rust
@@ -52,6 +58,11 @@ pub use size_align::{AlignOf, SizeOf};
 /// tied to the lifetime of the backing slice, meaning the
 /// `BumpInto` itself can be freely moved around, including
 /// between threads.
+///
+/// Values held in `BumpInto` allocations are never dropped.
+/// If they must be dropped, you can use `Option::take`,
+/// `core::mem::ManuallyDrop::drop`, or
+/// `core::ptr::drop_in_place` to drop them explicitly.
 pub struct BumpInto<'a> {
     array: UnsafeCell<&'a mut [MaybeUninit<u8>]>,
 }
