@@ -1034,13 +1034,14 @@ mod tests {
         assert_eq!(nothing4, &[(), (), (), ()]);
 
         let nothing5 = bump_into
-            .alloc_n_with(big_number, core::iter::from_fn(|| Some(ZstWithDrop)))
+            .alloc_n_with(big_number, core::iter::repeat_with(|| ZstWithDrop))
+            .ok()
             .expect("allocation 5 failed");
         assert_eq!(nothing5.len(), big_number);
 
         let nothing6 = unsafe {
             bump_into
-                .alloc_down_with_shared(core::iter::from_fn(|| Some(ZstWithDrop)).take(big_number))
+                .alloc_down_with_shared(core::iter::repeat_with(|| ZstWithDrop).take(big_number))
         };
         assert_eq!(nothing6.len(), big_number);
 
@@ -1070,11 +1071,12 @@ mod tests {
         let mut bump_into = BumpInto::from_slice(&mut space[..]);
 
         let nothing1 = bump_into
-            .alloc_n_with(usize::MAX, core::iter::from_fn(|| Some(ZstWithDrop)))
+            .alloc_n_with(usize::MAX, core::iter::repeat_with(|| ZstWithDrop))
+            .ok()
             .expect("allocation 1 failed");
         assert_eq!(nothing1.len(), usize::MAX);
 
-        let nothing2 = bump_into.alloc_down_with(core::iter::from_fn(|| Some(ZstWithDrop)));
+        let nothing2 = bump_into.alloc_down_with(core::iter::repeat_with(|| ZstWithDrop));
         assert_eq!(nothing2.len(), usize::MAX);
     }
 }
