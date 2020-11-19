@@ -7,10 +7,12 @@ in embedded applications and tight loops.
 ## Drop behavior
 
 Values held in `BumpInto` allocations are never dropped. If they must
-be dropped, you can use `core::mem::ManuallyDrop::drop` or
-`core::ptr::drop_in_place` to drop them explicitly (and unsafely).
-In safe code, you can allocate an `Option` and drop the value inside
+be dropped, you can use [`core::mem::ManuallyDrop::drop`] or
+[`core::ptr::drop_in_place`] to drop them explicitly (and unsafely).
+In safe code, you can allocate an [`Option`] and drop the value inside
 by overwriting it with `None`.
+
+[`Option`]: core::option::Option
 
 ## Example
 
@@ -63,10 +65,12 @@ pub use size_align::{AlignOf, SizeOf};
 ///
 /// Values held in `BumpInto` allocations are never dropped.
 /// If they must be dropped, you can use
-/// `core::mem::ManuallyDrop::drop` or `core::ptr::drop_in_place`
+/// [`core::mem::ManuallyDrop::drop`] or [`core::ptr::drop_in_place`]
 /// to drop them explicitly (and unsafely). In safe code, you can
-/// allocate an `Option` and drop the value inside by overwriting
+/// allocate an [`Option`] and drop the value inside by overwriting
 /// it with `None`.
+///
+/// [`Option`]: core::option::Option
 pub struct BumpInto<'a> {
     array: UnsafeCell<&'a mut [MaybeUninit<u8>]>,
 }
@@ -393,7 +397,7 @@ impl<'a> BumpInto<'a> {
     /// call *non-allocating* methods of `self` within the iterator,
     /// you can use the unsafe [`alloc_down_with_shared`].
     ///
-    /// [`alloc_down_with_shared`]: #method.alloc_down_with_shared
+    /// [`alloc_down_with_shared`]: Self::alloc_down_with_shared
     #[inline]
     pub fn alloc_down_with<T, I: IntoIterator<Item = T>>(&mut self, iter: I) -> &'a mut [T] {
         unsafe { self.alloc_down_with_shared(iter) }
@@ -402,7 +406,7 @@ impl<'a> BumpInto<'a> {
     /// Unsafe version of [`alloc_down_with`], taking `self` as a
     /// shared reference instead of a mutable reference.
     ///
-    /// [`alloc_down_with`]: #method.alloc_down_with
+    /// [`alloc_down_with`]: Self::alloc_down_with
     ///
     /// # Safety
     ///
