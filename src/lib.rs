@@ -1083,4 +1083,81 @@ mod tests {
         let nothing2 = bump_into.alloc_down_with(core::iter::repeat_with(|| ZstWithDrop));
         assert_eq!(nothing2.len(), usize::MAX);
     }
+
+    #[test]
+    fn iteration_count() {
+        let mut space = space_uninit!(u32; 32);
+        let mut bump_into = BumpInto::from_slice(&mut space[..]);
+
+        let mut iteration_count = 0u32;
+        let something1 = bump_into
+            .alloc_n_with(
+                16,
+                core::iter::repeat_with(|| {
+                    iteration_count += 1;
+                    iteration_count
+                }),
+            )
+            .ok()
+            .expect("allocation 1 failed");
+        assert_eq!(
+            something1,
+            &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+        );
+        assert_eq!(iteration_count, 16);
+
+        let mut iteration_count = 0usize;
+        let nothing2 = bump_into
+            .alloc_n_with(
+                256,
+                core::iter::repeat_with(|| {
+                    iteration_count += 1;
+                    ZstWithDrop
+                }),
+            )
+            .ok()
+            .expect("allocation 2 failed");
+        assert_eq!(nothing2.len(), 256);
+        assert_eq!(iteration_count, 256);
+
+        let mut iteration_count = 0u32;
+        let something3 = bump_into.alloc_down_with(core::iter::repeat_with(|| {
+            iteration_count += 1;
+            iteration_count
+        }));
+        assert_eq!(
+            something3,
+            &[16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1],
+        );
+        assert_eq!(iteration_count, 16);
+    }
+
+    #[test]
+    #[ignore = "hangs when optimizations are off"]
+    fn iteration_count_usize_max() {
+        let mut space = space_uninit!(u32; 32);
+        let mut bump_into = BumpInto::from_slice(&mut space[..]);
+
+        let mut iteration_count = 0u128;
+        let nothing1 = bump_into
+            .alloc_n_with(
+                usize::MAX,
+                core::iter::repeat_with(|| {
+                    iteration_count += 1;
+                    ZstWithDrop
+                }),
+            )
+            .ok()
+            .expect("allocation 1 failed");
+        assert_eq!(nothing1.len(), usize::MAX);
+        assert_eq!(iteration_count, usize::MAX as u128);
+
+        let mut iteration_count = 0u128;
+        let nothing2 = bump_into.alloc_down_with(core::iter::repeat_with(|| {
+            iteration_count += 1;
+            ZstWithDrop
+        }));
+        assert_eq!(nothing2.len(), usize::MAX);
+        assert_eq!(iteration_count, usize::MAX as u128);
+    }
 }
