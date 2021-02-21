@@ -511,23 +511,23 @@ impl<'a> fmt::Debug for BumpInto<'a> {
 /// ```
 #[macro_export]
 macro_rules! space_uninit {
-    ($capacity:expr) => {{
-        extern crate core;
-
+    ($capacity:expr) => {
         unsafe {
+            extern crate core;
+
             core::mem::MaybeUninit::<[core::mem::MaybeUninit<u8>; $capacity]>::uninit()
                 .assume_init()
         }
-    }};
+    };
 
-    ($like_ty:ty; $capacity:expr) => {{
-        extern crate core;
-
+    ($like_ty:ty; $capacity:expr) => {
         unsafe {
+            extern crate core;
+
             core::mem::MaybeUninit::<[core::mem::MaybeUninit<$like_ty>; $capacity]>::uninit()
                 .assume_init()
         }
-    }};
+    };
 }
 
 /// Creates a zeroed array of `MaybeUninit` without allocating,
@@ -552,23 +552,23 @@ macro_rules! space_uninit {
 /// ```
 #[macro_export]
 macro_rules! space_zeroed {
-    ($capacity:expr) => {{
-        extern crate core;
-
+    ($capacity:expr) => {
         unsafe {
+            extern crate core;
+
             core::mem::MaybeUninit::<[core::mem::MaybeUninit<u8>; $capacity]>::zeroed()
                 .assume_init()
         }
-    }};
+    };
 
-    ($like_ty:ty; $capacity:expr) => {{
-        extern crate core;
-
+    ($like_ty:ty; $capacity:expr) => {
         unsafe {
+            extern crate core;
+
             core::mem::MaybeUninit::<[core::mem::MaybeUninit<$like_ty>; $capacity]>::zeroed()
                 .assume_init()
         }
-    }};
+    };
 }
 
 /// Creates an uninitialized array of one `MaybeUninit` without
@@ -598,7 +598,7 @@ macro_rules! space_uninit_aligned {
 
         #[repr(C, align($align))]
         struct Space {
-            _contents: [u8; $size],
+            _contents: [core::primitive::u8; $size],
         }
 
         unsafe {
@@ -634,7 +634,7 @@ macro_rules! space_zeroed_aligned {
 
         #[repr(C, align($align))]
         struct Space {
-            _contents: [u8; $size],
+            _contents: [core::primitive::u8; $size],
         }
 
         unsafe {
