@@ -54,6 +54,5 @@ assert_eq!(slice, &[10, 10, 100, 10, 10]);
 
 Copyright (c) 2020 autumnontape
 
-This project may be reproduced under the terms of the MIT or
-the Apache 2.0 license, at your option. A copy of each license
-is included.
+This project may be reproduced under the terms of the MIT license,
+a copy of which should be available to you in a file called COPYING.
