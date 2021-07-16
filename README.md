@@ -52,7 +52,7 @@ assert_eq!(slice, &[10, 10, 100, 10, 10]);
 
 ## Copying
 
-Copyright (c) 2020 autumnontape
+Copyright (c) 2020-21 autumnontape
 
 This project may be reproduced under the terms of the MIT license,
 a copy of which should be available to you in a file called COPYING.
