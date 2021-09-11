@@ -923,13 +923,16 @@ mod tests {
             assert_eq!(bump_into.available_bytes(), 0);
             assert_eq!(*something1, 0x8359);
             assert_eq!(*something2, 0x1312);
-            *something1 = 0x1312;
-            assert_eq!(*something1, 0x1312);
+            *something1 = 0xACAB;
+            assert_eq!(*something1, 0xACAB);
             assert_eq!(*something2, 0x1312);
         }
 
         unsafe {
-            assert_eq!(space.assume_init(), 0x13121312);
+            #[cfg(target_endian = "little")]
+            assert_eq!(space.assume_init(), 0xACAB1312);
+            #[cfg(target_endian = "big")]
+            assert_eq!(space.assume_init(), 0x1312ACAB);
         }
     }
 
