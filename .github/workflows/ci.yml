@@ -41,8 +41,10 @@ jobs:
         toolchain: nightly
         override: true
         components: miri, rust-src
-    - name: Run tests under Miri
-      run: cargo miri test --verbose
+    - name: Run tests under Miri, little-endian
+      run: cargo miri test --verbose --target x86_64-unknown-linux-gnu
+    - name: Run tests under Miri, big-endian
+      run: cargo miri test --verbose --target mips64-unknown-linux-gnuabi64
   fmt:
     name: rustfmt
     runs-on: ubuntu-latest
