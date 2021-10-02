@@ -490,6 +490,8 @@ impl<'a> BumpInto<'a> {
             }
         }
 
+        let iter = iter.into_iter();
+
         if mem::size_of::<T>() == 0 {
             // this is both meant as an optimization and to bypass
             // the `aligned_end <= array_start` check, since
@@ -499,7 +501,7 @@ impl<'a> BumpInto<'a> {
             // than `usize::MAX` objects, which is obviously implicit
             // on the positive-size path.
             #[allow(clippy::suspicious_map)]
-            let count = iter.into_iter().take(usize::MAX).map(mem::forget).count();
+            let count = iter.take(usize::MAX).map(mem::forget).count();
             return core::slice::from_raw_parts_mut(NonNull::dangling().as_ptr(), count);
         }
 
@@ -520,7 +522,7 @@ impl<'a> BumpInto<'a> {
             return &mut [];
         }
 
-        alloc_down_with_shared_inner(self, iter.into_iter(), array_start, aligned_end)
+        alloc_down_with_shared_inner(self, iter, array_start, aligned_end)
     }
 }
 
