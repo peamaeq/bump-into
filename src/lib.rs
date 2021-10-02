@@ -366,6 +366,7 @@ impl<'a> BumpInto<'a> {
     ///
     /// Allocating within the iterator's `next` method is allowed;
     /// iteration only begins after the initial allocation succeeds.
+    #[inline]
     pub fn alloc_n_with<T, I: IntoIterator<Item = T>>(
         &self,
         count: usize,
@@ -383,24 +384,36 @@ impl<'a> BumpInto<'a> {
             }
         }
 
+        // the core loop is split into its own non-inline-annotated
+        // function. since it's possible for different types to implement
+        // IntoIterator with the same IntoIter associated type, this may
+        // reduce the number of monomorphized functions in the generated
+        // code, in addition to making the compiler more likely to inline
+        // the parts of alloc_n_with that will benefit most from inlining.
+        unsafe fn alloc_n_with_inner<'a, T, I: Iterator<Item = T>>(
+            pointer: *mut T,
+            count: usize,
+            mut iter: I,
+        ) -> &'a mut [T] {
+            for index in 0..count {
+                if iter_and_write(pointer.add(index), &mut iter) {
+                    // iterator ended before we could fill the whole space.
+                    return core::slice::from_raw_parts_mut(pointer, index);
+                }
+            }
+
+            core::slice::from_raw_parts_mut(pointer, count)
+        }
+
         let pointer = self.alloc_space_for_n::<T>(count);
 
         if pointer.is_null() {
             return Err(iter);
         }
 
-        let mut iter = iter.into_iter();
+        let iter = iter.into_iter();
 
-        unsafe {
-            for index in 0..count {
-                if iter_and_write(pointer.add(index), &mut iter) {
-                    // iterator ended before we could fill the whole space.
-                    return Ok(core::slice::from_raw_parts_mut(pointer, index));
-                }
-            }
-
-            Ok(core::slice::from_raw_parts_mut(pointer, count))
-        }
+        unsafe { Ok(alloc_n_with_inner(pointer, count, iter)) }
     }
 
     /// Allocates enough space to store as many of the values produced
