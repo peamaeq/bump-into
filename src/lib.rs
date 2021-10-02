@@ -299,6 +299,27 @@ impl<'a> BumpInto<'a> {
         }
     }
 
+    /// Tries to allocate enough space to store a `T` and copy the value
+    /// pointed to by `x` into it.
+    ///
+    /// On success (i.e. if there was enough space) produces a mutable
+    /// reference to the copy with the lifetime of this `BumpInto`'s
+    /// backing slice (`'a`).
+    #[inline]
+    pub fn alloc_copy<T: Copy>(&self, x: &T) -> Option<&'a mut T> {
+        let pointer = self.alloc_space_for::<T>();
+
+        if pointer.is_null() {
+            return None;
+        }
+
+        unsafe {
+            ptr::copy_nonoverlapping(x as *const T, pointer, 1);
+
+            Some(&mut *pointer)
+        }
+    }
+
     /// Tries to allocate enough space to store a copy of `xs` and copy
     /// `xs` into it.
     ///
@@ -306,7 +327,7 @@ impl<'a> BumpInto<'a> {
     /// reference to the copy with the lifetime of this `BumpInto`'s
     /// backing slice (`'a`).
     #[inline]
-    pub fn alloc_slice<T: Copy>(&self, xs: &[T]) -> Option<&'a mut [T]> {
+    pub fn alloc_copy_slice<T: Copy>(&self, xs: &[T]) -> Option<&'a mut [T]> {
         if mem::size_of::<T>() == 0 {
             unsafe {
                 return Some(core::slice::from_raw_parts_mut(
@@ -670,16 +691,26 @@ mod tests {
         assert_eq!(*something2, 7775u16);
         assert_eq!(*something3, 251222u64);
 
-        if bump_into.alloc_with(|| [0u32; 128]).is_ok() {
-            panic!("allocation 4 succeeded");
-        }
-
-        let something5 = bump_into.alloc(123523u32).expect("allocation 5 failed");
+        let something4 = bump_into
+            .alloc_copy(&289303u32)
+            .expect("allocation 4 failed");
 
         assert_eq!(*something1, 123u64);
         assert_eq!(*something2, 7775u16);
         assert_eq!(*something3, 251222u64);
-        assert_eq!(*something5, 123523u32);
+        assert_eq!(*something4, 289303u32);
+
+        if bump_into.alloc_with(|| [0u32; 128]).is_ok() {
+            panic!("allocation 5 succeeded");
+        }
+
+        let something6 = bump_into.alloc(123523u32).expect("allocation 6 failed");
+
+        assert_eq!(*something1, 123u64);
+        assert_eq!(*something2, 7775u16);
+        assert_eq!(*something3, 251222u64);
+        assert_eq!(*something4, 289303u32);
+        assert_eq!(*something6, 123523u32);
     }
 
     #[test]
@@ -688,13 +719,13 @@ mod tests {
         let bump_into = BumpInto::from_slice(&mut space[..]);
 
         let something1 = bump_into
-            .alloc_slice(&[1u32, 258909, 1000][..])
+            .alloc_copy_slice(&[1u32, 258909, 1000][..])
             .expect("allocation 1 failed");
 
         assert_eq!(something1, &[1u32, 258909, 1000][..]);
 
         let something2 = bump_into
-            .alloc_slice(&[1u64, 258909, 1000, 0][..])
+            .alloc_copy_slice(&[1u64, 258909, 1000, 0][..])
             .expect("allocation 2 failed");
 
         assert_eq!(something1, &[1u32, 258909, 1000][..]);
@@ -1036,7 +1067,7 @@ mod tests {
             .expect("allocation 3 failed");
 
         let nothing4 = bump_into
-            .alloc_slice(&[(), (), (), ()])
+            .alloc_copy_slice(&[(), (), (), ()])
             .expect("allocation 4 failed");
         assert_eq!(nothing4, &[(), (), (), ()]);
 
@@ -1054,7 +1085,7 @@ mod tests {
 
         let nothing7_array = [(); usize::MAX];
         let nothing7 = bump_into
-            .alloc_slice(&nothing7_array)
+            .alloc_copy_slice(&nothing7_array)
             .expect("allocation 7 failed");
         assert_eq!(nothing7.len(), usize::MAX);
     }
