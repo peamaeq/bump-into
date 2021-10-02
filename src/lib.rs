@@ -448,10 +448,48 @@ impl<'a> BumpInto<'a> {
     /// are called from within the `next` method of the iterator, with
     /// the exception of the `available_bytes`, `available_spaces`,
     /// and `available_spaces_for` methods, which are safe.
+    #[inline]
     pub unsafe fn alloc_down_with_shared<T, I: IntoIterator<Item = T>>(
         &self,
         iter: I,
     ) -> &'a mut [T] {
+        unsafe fn alloc_down_with_shared_inner<'a, T, I: Iterator<Item = T>>(
+            bump_into: &BumpInto<'a>,
+            mut iter: I,
+            array_start: usize,
+            mut cur_space: usize,
+        ) -> &'a mut [T] {
+            let mut count = 0;
+
+            loop {
+                let next_space = cur_space.checked_sub(mem::size_of::<T>());
+
+                let finished = match next_space {
+                    Some(next_space) if next_space >= array_start => match iter.next() {
+                        Some(item) => {
+                            cur_space = next_space;
+                            {
+                                let array = &mut *bump_into.array.get();
+                                *array = &mut array[..cur_space - array_start];
+                            }
+
+                            ptr::write(cur_space as *mut T, item);
+
+                            false
+                        }
+                        None => true,
+                    },
+                    _ => true,
+                };
+
+                if finished {
+                    return core::slice::from_raw_parts_mut(cur_space as *mut T, count);
+                }
+
+                count += 1;
+            }
+        }
+
         if mem::size_of::<T>() == 0 {
             // this is both meant as an optimization and to bypass
             // the `aligned_end <= array_start` check, since
@@ -482,38 +520,7 @@ impl<'a> BumpInto<'a> {
             return &mut [];
         }
 
-        let mut iter = iter.into_iter();
-
-        let mut count = 0;
-        let mut cur_space = aligned_end;
-
-        loop {
-            let next_space = cur_space.checked_sub(mem::size_of::<T>());
-
-            let finished = match next_space {
-                Some(next_space) if next_space >= array_start => match iter.next() {
-                    Some(item) => {
-                        cur_space = next_space;
-                        {
-                            let array = &mut *self.array.get();
-                            *array = &mut array[..cur_space - array_start];
-                        }
-
-                        ptr::write(cur_space as *mut T, item);
-
-                        false
-                    }
-                    None => true,
-                },
-                _ => true,
-            };
-
-            if finished {
-                return core::slice::from_raw_parts_mut(cur_space as *mut T, count);
-            }
-
-            count += 1;
-        }
+        alloc_down_with_shared_inner(self, iter.into_iter(), array_start, aligned_end)
     }
 }
 
