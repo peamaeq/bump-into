@@ -2,6 +2,7 @@
 name = "bump-into"
 version = "0.7.2"
 edition = "2018"
+rust-version = "1.43"
 authors = ["Autumn <autumnontape@tutanota.com>"]
 description = "a no_std bump allocator sourcing space from a user-provided slice"
 license = "MIT"
