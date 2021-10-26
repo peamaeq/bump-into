@@ -372,6 +372,31 @@ impl<'a> BumpInto<'a> {
         count: usize,
         iter: I,
     ) -> Result<&'a mut [T], I> {
+        let pointer = self.alloc_space_for_n::<T>(count);
+
+        if pointer.is_null() {
+            return Err(iter);
+        }
+
+        let iter = iter.into_iter();
+
+        unsafe { Ok(Self::alloc_n_with_inner(pointer, count, iter)) }
+    }
+
+    // the core loop of alloc_n_with is split into its own non-inline-
+    // annotated function. since it's possible for different types to
+    // implement IntoIterator with the same IntoIter associated type,
+    // this may reduce the number of monomorphized functions in the
+    // generated code, in addition to making the compiler more likely
+    // to inline the parts of alloc_n_with that will benefit most from
+    // inlining. the split function is here instead of inside
+    // alloc_n_with because it's reused in alloc_down_with_shared for
+    // the ZST case.
+    unsafe fn alloc_n_with_inner<'b, T, I: Iterator<Item = T>>(
+        pointer: *mut T,
+        count: usize,
+        mut iter: I,
+    ) -> &'b mut [T] {
         #[inline(always)]
         unsafe fn iter_and_write<T, I: Iterator<Item = T>>(pointer: *mut T, mut iter: I) -> bool {
             match iter.next() {
@@ -384,36 +409,14 @@ impl<'a> BumpInto<'a> {
             }
         }
 
-        // the core loop is split into its own non-inline-annotated
-        // function. since it's possible for different types to implement
-        // IntoIterator with the same IntoIter associated type, this may
-        // reduce the number of monomorphized functions in the generated
-        // code, in addition to making the compiler more likely to inline
-        // the parts of alloc_n_with that will benefit most from inlining.
-        unsafe fn alloc_n_with_inner<'a, T, I: Iterator<Item = T>>(
-            pointer: *mut T,
-            count: usize,
-            mut iter: I,
-        ) -> &'a mut [T] {
-            for index in 0..count {
-                if iter_and_write(pointer.add(index), &mut iter) {
-                    // iterator ended before we could fill the whole space.
-                    return core::slice::from_raw_parts_mut(pointer, index);
-                }
+        for index in 0..count {
+            if iter_and_write(pointer.add(index), &mut iter) {
+                // iterator ended before we could fill the whole space.
+                return core::slice::from_raw_parts_mut(pointer, index);
             }
-
-            core::slice::from_raw_parts_mut(pointer, count)
         }
 
-        let pointer = self.alloc_space_for_n::<T>(count);
-
-        if pointer.is_null() {
-            return Err(iter);
-        }
-
-        let iter = iter.into_iter();
-
-        unsafe { Ok(alloc_n_with_inner(pointer, count, iter)) }
+        core::slice::from_raw_parts_mut(pointer, count)
     }
 
     /// Allocates enough space to store as many of the values produced
@@ -500,9 +503,7 @@ impl<'a> BumpInto<'a> {
             // we also enforce here that an allocation have no more
             // than `usize::MAX` objects, which is obviously implicit
             // on the positive-size path.
-            #[allow(clippy::suspicious_map)]
-            let count = iter.take(usize::MAX).map(mem::forget).count();
-            return core::slice::from_raw_parts_mut(NonNull::dangling().as_ptr(), count);
+            return Self::alloc_n_with_inner(NonNull::dangling().as_ptr(), usize::MAX, iter);
         }
 
         let (array_start, current_end) = {
