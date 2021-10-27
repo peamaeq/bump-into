@@ -641,12 +641,13 @@ macro_rules! space_uninit_aligned {
         extern crate core;
 
         #[repr(C, align($align))]
-        struct Space {
+        struct __BUMP_INTO_Space {
             _contents: [core::primitive::u8; $size],
         }
 
         unsafe {
-            core::mem::MaybeUninit::<[core::mem::MaybeUninit<Space>; 1]>::uninit().assume_init()
+            core::mem::MaybeUninit::<[core::mem::MaybeUninit<__BUMP_INTO_Space>; 1]>::uninit()
+                .assume_init()
         }
     }};
 }
@@ -677,12 +678,13 @@ macro_rules! space_zeroed_aligned {
         extern crate core;
 
         #[repr(C, align($align))]
-        struct Space {
+        struct __BUMP_INTO_Space {
             _contents: [core::primitive::u8; $size],
         }
 
         unsafe {
-            core::mem::MaybeUninit::<[core::mem::MaybeUninit<Space>; 1]>::zeroed().assume_init()
+            core::mem::MaybeUninit::<[core::mem::MaybeUninit<__BUMP_INTO_Space>; 1]>::zeroed()
+                .assume_init()
         }
     }};
 }
