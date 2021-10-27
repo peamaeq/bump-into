@@ -559,7 +559,7 @@ macro_rules! space_uninit {
         unsafe {
             extern crate core;
 
-            core::mem::MaybeUninit::<[core::mem::MaybeUninit<u8>; $capacity]>::uninit()
+            core::mem::MaybeUninit::<[core::mem::MaybeUninit<core::primitive::u8>; $capacity]>::uninit()
                 .assume_init()
         }
     };
@@ -600,7 +600,7 @@ macro_rules! space_zeroed {
         unsafe {
             extern crate core;
 
-            core::mem::MaybeUninit::<[core::mem::MaybeUninit<u8>; $capacity]>::zeroed()
+            core::mem::MaybeUninit::<[core::mem::MaybeUninit<core::primitive::u8>; $capacity]>::zeroed()
                 .assume_init()
         }
     };
