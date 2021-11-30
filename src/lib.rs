@@ -350,6 +350,67 @@ impl<'a> BumpInto<'a> {
         }
     }
 
+    /// Tries to allocate enough space to store the concatenation of
+    /// the slices in `xs_s` and build said concatenation by copying
+    /// the contents of each slice in order.
+    ///
+    /// On success (i.e. if there was enough space) produces a mutable
+    /// reference to the copy with the lifetime of this `BumpInto`'s
+    /// backing slice (`'a`).
+    ///
+    /// ## Example
+    ///
+    /// ```rust
+    /// use bump_into::{self, BumpInto};
+    ///
+    /// let mut space = bump_into::space_uninit!(16);
+    /// let bump_into = BumpInto::from_slice(&mut space[..]);
+    /// let bytestring = b"Hello, World!";
+    ///
+    /// let null_terminated_bytestring = bump_into
+    ///     .alloc_copy_gather_slices(&[bytestring, &[0]])
+    ///     .unwrap();
+    ///
+    /// assert_eq!(null_terminated_bytestring, b"Hello, World!\0");
+    /// ```
+    #[inline]
+    pub fn alloc_copy_gather_slices<T: Copy>(&self, xs_s: &[&[T]]) -> Option<&'a mut [T]> {
+        let total_len = match xs_s
+            .iter()
+            .try_fold(0usize, |acc, xs| acc.checked_add(xs.len()))
+        {
+            Some(total_len) => total_len,
+            None => return None,
+        };
+
+        if mem::size_of::<T>() == 0 {
+            unsafe {
+                return Some(core::slice::from_raw_parts_mut(
+                    NonNull::dangling().as_ptr(),
+                    total_len,
+                ));
+            }
+        }
+
+        let pointer = self.alloc_space_for_n::<T>(total_len);
+
+        if pointer.is_null() {
+            return None;
+        }
+
+        unsafe {
+            let mut dest_pointer = pointer;
+
+            for &xs in xs_s {
+                ptr::copy_nonoverlapping(xs as *const [T] as *const T, dest_pointer, xs.len());
+
+                dest_pointer = dest_pointer.add(xs.len());
+            }
+
+            Some(core::slice::from_raw_parts_mut(pointer, total_len))
+        }
+    }
+
     /// Tries to allocate enough space to store `count` number of `T` and
     /// fill it with the values produced by `iter.into_iter()`.
     ///
@@ -742,7 +803,7 @@ mod tests {
 
     #[test]
     fn alloc_n() {
-        let mut space = space_uninit!(192);
+        let mut space = space_uninit!(256);
         let bump_into = BumpInto::from_slice(&mut space[..]);
 
         let something1 = bump_into
@@ -788,6 +849,27 @@ mod tests {
         assert_eq!(something3, &[61921u16; 5]);
         assert_eq!(something4, &[71u64]);
         assert_eq!(something6, &[]);
+
+        let something7 = bump_into
+            .alloc_copy_gather_slices(&[&[1u32, 258909, 1000]])
+            .expect("allocation 7 failed");
+
+        assert_eq!(something7, &[1u32, 258909, 1000]);
+
+        let something8 = bump_into
+            .alloc_copy_gather_slices(&[&[1u32, 258909, 1000], &[9999], &[]])
+            .expect("allocation 8 failed");
+
+        assert_eq!(something8, &[1u32, 258909, 1000, 9999]);
+
+        let something9 = bump_into
+            .alloc_copy_gather_slices(&[something7, something7, &[1, 2, 3], something7])
+            .expect("allocation 9 failed");
+
+        assert_eq!(
+            something9,
+            &[1u32, 258909, 1000, 1u32, 258909, 1000, 1, 2, 3, 1u32, 258909, 1000],
+        );
     }
 
     #[test]
@@ -1115,6 +1197,35 @@ mod tests {
             .alloc_copy_slice(&nothing7_array)
             .expect("allocation 7 failed");
         assert_eq!(nothing7.len(), usize::MAX);
+
+        let nothing8 = bump_into
+            .alloc_copy_gather_slices(&[&[(), ()], &[(), (), ()], &[]])
+            .expect("allocation 8 failed");
+        assert_eq!(nothing8, &[(), (), (), (), ()]);
+
+        let nothing9_array = [(); usize::MAX];
+        let nothing9 = bump_into
+            .alloc_copy_gather_slices(&[&nothing9_array])
+            .expect("allocation 9 failed");
+        assert_eq!(nothing9.len(), usize::MAX);
+
+        let nothing10_array = [(); usize::MAX >> 4];
+        let nothing10 = bump_into
+            .alloc_copy_gather_slices(&[&nothing10_array[..]; 16])
+            .expect("allocation 10 failed");
+        assert_eq!(nothing10.len(), usize::MAX & !15);
+
+        let nothing11_array = [(); usize::MAX];
+        let nothing11 = bump_into.alloc_copy_gather_slices(&[&nothing11_array, &[(); 1][..]]);
+        if nothing11.is_some() {
+            panic!("allocation 11 succeeded");
+        }
+
+        let nothing12_array = [(); usize::MAX];
+        let nothing12 = bump_into.alloc_copy_gather_slices(&[&nothing12_array[..]; 2]);
+        if nothing12.is_some() {
+            panic!("allocation 12 succeeded");
+        }
     }
 
     #[test]
