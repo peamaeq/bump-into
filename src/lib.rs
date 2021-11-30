@@ -746,34 +746,34 @@ mod tests {
         let bump_into = BumpInto::from_slice(&mut space[..]);
 
         let something1 = bump_into
-            .alloc_copy_slice(&[1u32, 258909, 1000][..])
+            .alloc_copy_slice(&[1u32, 258909, 1000])
             .expect("allocation 1 failed");
 
-        assert_eq!(something1, &[1u32, 258909, 1000][..]);
+        assert_eq!(something1, &[1u32, 258909, 1000]);
 
         let something2 = bump_into
-            .alloc_copy_slice(&[1u64, 258909, 1000, 0][..])
+            .alloc_copy_slice(&[1u64, 258909, 1000, 0])
             .expect("allocation 2 failed");
 
-        assert_eq!(something1, &[1u32, 258909, 1000][..]);
-        assert_eq!(something2, &[1u64, 258909, 1000, 0][..]);
+        assert_eq!(something1, &[1u32, 258909, 1000]);
+        assert_eq!(something2, &[1u64, 258909, 1000, 0]);
 
         let something3 = bump_into
             .alloc_n_with(5, core::iter::repeat(61921u16))
             .expect("allocation 3 failed");
 
-        assert_eq!(something1, &[1u32, 258909, 1000][..]);
-        assert_eq!(something2, &[1u64, 258909, 1000, 0][..]);
-        assert_eq!(something3, &[61921u16; 5][..]);
+        assert_eq!(something1, &[1u32, 258909, 1000]);
+        assert_eq!(something2, &[1u64, 258909, 1000, 0]);
+        assert_eq!(something3, &[61921u16; 5]);
 
         let something4 = bump_into
             .alloc_n_with(6, core::iter::once(71u64))
             .expect("allocation 4 failed");
 
-        assert_eq!(something1, &[1u32, 258909, 1000][..]);
-        assert_eq!(something2, &[1u64, 258909, 1000, 0][..]);
-        assert_eq!(something3, &[61921u16; 5][..]);
-        assert_eq!(something4, &[71u64][..]);
+        assert_eq!(something1, &[1u32, 258909, 1000]);
+        assert_eq!(something2, &[1u64, 258909, 1000, 0]);
+        assert_eq!(something3, &[61921u16; 5]);
+        assert_eq!(something4, &[71u64]);
 
         if bump_into.alloc_n_with::<u64, _>(100, None).is_ok() {
             panic!("allocation 5 succeeded");
@@ -783,10 +783,10 @@ mod tests {
             .alloc_n_with::<u64, _>(6, None)
             .expect("allocation 6 failed");
 
-        assert_eq!(something1, &[1u32, 258909, 1000][..]);
-        assert_eq!(something2, &[1u64, 258909, 1000, 0][..]);
-        assert_eq!(something3, &[61921u16; 5][..]);
-        assert_eq!(something4, &[71u64][..]);
+        assert_eq!(something1, &[1u32, 258909, 1000]);
+        assert_eq!(something2, &[1u64, 258909, 1000, 0]);
+        assert_eq!(something3, &[61921u16; 5]);
+        assert_eq!(something4, &[71u64]);
         assert_eq!(something6, &[]);
     }
 
