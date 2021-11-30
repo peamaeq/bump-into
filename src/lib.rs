@@ -555,23 +555,24 @@ impl<'a> fmt::Debug for BumpInto<'a> {
 /// ```
 #[macro_export]
 macro_rules! space_uninit {
-    ($capacity:expr) => {
-        unsafe {
-            extern crate core;
+    ($capacity:expr) => {{
+        extern crate core;
 
-            core::mem::MaybeUninit::<[core::mem::MaybeUninit<core::primitive::u8>; $capacity]>::uninit()
-                .assume_init()
-        }
-    };
+        let outer_maybe_uninit = core::mem::MaybeUninit::<
+            [core::mem::MaybeUninit<core::primitive::u8>; $capacity],
+        >::uninit();
 
-    ($like_ty:ty; $capacity:expr) => {
-        unsafe {
-            extern crate core;
+        unsafe { outer_maybe_uninit.assume_init() }
+    }};
 
-            core::mem::MaybeUninit::<[core::mem::MaybeUninit<$like_ty>; $capacity]>::uninit()
-                .assume_init()
-        }
-    };
+    ($like_ty:ty; $capacity:expr) => {{
+        extern crate core;
+
+        let outer_maybe_uninit =
+            core::mem::MaybeUninit::<[core::mem::MaybeUninit<$like_ty>; $capacity]>::uninit();
+
+        unsafe { outer_maybe_uninit.assume_init() }
+    }};
 }
 
 /// Creates a zeroed array of `MaybeUninit` without allocating,
@@ -596,23 +597,24 @@ macro_rules! space_uninit {
 /// ```
 #[macro_export]
 macro_rules! space_zeroed {
-    ($capacity:expr) => {
-        unsafe {
-            extern crate core;
+    ($capacity:expr) => {{
+        extern crate core;
 
-            core::mem::MaybeUninit::<[core::mem::MaybeUninit<core::primitive::u8>; $capacity]>::zeroed()
-                .assume_init()
-        }
-    };
+        let outer_maybe_uninit = core::mem::MaybeUninit::<
+            [core::mem::MaybeUninit<core::primitive::u8>; $capacity],
+        >::zeroed();
 
-    ($like_ty:ty; $capacity:expr) => {
-        unsafe {
-            extern crate core;
+        unsafe { outer_maybe_uninit.assume_init() }
+    }};
 
-            core::mem::MaybeUninit::<[core::mem::MaybeUninit<$like_ty>; $capacity]>::zeroed()
-                .assume_init()
-        }
-    };
+    ($like_ty:ty; $capacity:expr) => {{
+        extern crate core;
+
+        let outer_maybe_uninit =
+            core::mem::MaybeUninit::<[core::mem::MaybeUninit<$like_ty>; $capacity]>::zeroed();
+
+        unsafe { outer_maybe_uninit.assume_init() }
+    }};
 }
 
 /// Creates an uninitialized array of one `MaybeUninit` without
