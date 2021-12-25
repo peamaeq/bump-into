@@ -46,6 +46,7 @@ assert_eq!(slice, &[10, 10, 100, 10, 10]);
 */
 
 #![no_std]
+#![cfg_attr(feature = "nightly", feature(generic_const_exprs))]
 
 pub mod layout_of;
 
@@ -146,7 +147,11 @@ impl<'a> BumpInto<'a> {
     /// Returns `usize::MAX` if `T` is a zero-sized type.
     #[inline]
     pub fn available_spaces_for<T>(&self) -> usize {
-        self.available_spaces(layout_of::Single::<T>::new())
+        #[cfg(not(feature = "nightly"))]
+        { self.available_spaces(layout_of::Single::<T>::new()) }
+
+        #[cfg(feature = "nightly")]
+        { self.available_spaces(layout_of::Single::<T>::new_nightly()) }
     }
 
     /// Tries to allocate `size` bytes with alignment `align`.

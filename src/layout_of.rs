@@ -72,3 +72,60 @@ impl<T> From<Array<T>> for Option<Layout> {
         Layout::array::<T>(array.len).ok()
     }
 }
+
+#[cfg(feature = "nightly")]
+pub(crate) mod nightly {
+    use core::alloc::Layout;
+    use core::mem::{align_of, size_of};
+
+    #[derive(Default, Debug, Copy, Clone)]
+    pub(crate) struct Single<const S: usize, const A: usize> {
+        _sealed: (),
+    }
+
+    impl<T> super::Single<T> {
+        /// Create a `Single<T>`.
+        #[inline]
+        pub(crate) fn new_nightly() -> Single<{ size_of::<T>() }, { align_of::<T>() }> {
+            Single {
+                _sealed: (),
+            }
+        }
+    }
+
+    impl<const S: usize, const A: usize> From<Single<S, A>> for Option<Layout> {
+        #[inline]
+        fn from(_: Single<S, A>) -> Option<Layout> {
+            unsafe {
+                Some(Layout::from_size_align_unchecked(S, A))
+            }
+        }
+    }
+
+    #[derive(Debug, Copy, Clone)]
+    pub(crate) struct Array<const A: usize> {
+        bytes: Option<usize>,
+    }
+
+    impl<T> super::Array<T> {
+        /// Create an `Array<T>`.
+        #[inline]
+        pub(crate) fn from_len_nightly(len: usize) -> Array<{ align_of::<T>() }> {
+            Array {
+                bytes: size_of::<T>().checked_mul(len),
+            }
+        }
+    }
+
+    impl<const A: usize> From<Array<A>> for Option<Layout> {
+        #[inline]
+        fn from(array: Array<A>) -> Option<Layout> {
+            match array.bytes {
+                Some(bytes) => unsafe {
+                    Some(Layout::from_size_align_unchecked(bytes, A))
+                }
+                None => None,
+            }
+        }
+    }
+}

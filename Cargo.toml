@@ -12,3 +12,6 @@ readme = "README.md"
 documentation = "https://docs.rs/bump-into"
 
 [dependencies]
+
+[features]
+nightly = []
