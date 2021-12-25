@@ -47,14 +47,13 @@ assert_eq!(slice, &[10, 10, 100, 10, 10]);
 
 #![no_std]
 
-mod size_align;
+pub mod layout_of;
 
+use core::alloc::Layout;
 use core::cell::UnsafeCell;
 use core::fmt;
 use core::mem::{self, MaybeUninit};
 use core::ptr::{self, NonNull};
-
-pub use size_align::{AlignOf, SizeOf};
 
 /// A bump allocator sourcing space from an `&mut [MaybeUninit]`.
 ///
@@ -103,13 +102,25 @@ impl<'a> BumpInto<'a> {
     /// # Panics
     ///
     /// Panics if `align` is zero.
-    pub fn available_spaces<S: Into<usize>, A: Into<usize>>(&self, size: S, align: A) -> usize {
-        let size = size.into();
-        let align = align.into();
+    ///
+    /// # Notes
+    ///
+    /// This function is safe, but it will return an unspecified
+    /// value if `layout` has a size that isn't a multiple of its
+    /// alignment. All types in Rust have sizes that are multiples
+    /// of their alignments, so this function will behave as
+    /// expected when given `Layout`s corresponding to actual
+    /// types, such as those created with [`Layout::new`] or
+    /// [`Layout::array`]. You can use [`Layout::pad_to_align`] to
+    /// make sure a `Layout` meets the requirement.
+    pub fn available_spaces<L: Into<Option<Layout>>>(&self, layout: L) -> usize {
+        let layout = match layout.into() {
+            Some(layout) => layout,
+            None => return 0,
+        };
 
-        if align == 0 {
-            panic!("alignment must not be zero");
-        }
+        let size = layout.size();
+        let align = layout.align();
 
         if size == 0 {
             return usize::MAX;
@@ -119,7 +130,7 @@ impl<'a> BumpInto<'a> {
 
         let array_start = *array as *mut [MaybeUninit<u8>] as *mut MaybeUninit<u8> as usize;
         let current_end = array_start + array.len();
-        let aligned_end = (current_end / align) * align;
+        let aligned_end = current_end & !(align - 1);
 
         if aligned_end <= array_start {
             return 0;
@@ -135,7 +146,7 @@ impl<'a> BumpInto<'a> {
     /// Returns `usize::MAX` if `T` is a zero-sized type.
     #[inline]
     pub fn available_spaces_for<T>(&self) -> usize {
-        self.available_spaces(SizeOf::<T>::new(), AlignOf::<T>::new())
+        self.available_spaces(layout_of::Single::<T>::new())
     }
 
     /// Tries to allocate `size` bytes with alignment `align`.
@@ -144,31 +155,19 @@ impl<'a> BumpInto<'a> {
     /// # Panics
     ///
     /// Panics if `align` is zero.
-    pub fn alloc_space<S: Into<usize>, A: Into<usize>>(
-        &self,
-        size: S,
-        align: A,
-    ) -> *mut MaybeUninit<u8> {
-        let size = size.into();
-        let align = align.into();
+    pub fn alloc_space<L: Into<Option<Layout>>>(&self, layout: L) -> *mut MaybeUninit<u8> {
+        let layout = match layout.into() {
+            Some(layout) => layout,
+            None => return ptr::null_mut(),
+        };
 
-        if align == 0 {
-            panic!("alignment must not be zero");
-        }
+        let size = layout.size();
+        let align = layout.align();
 
         if size == 0 {
             // optimization for zero-sized types, as pointers to
             // such types don't have to be distinct in Rust
             return align as *mut MaybeUninit<u8>;
-        }
-
-        if size > isize::MAX as usize {
-            // Rust doesn't really support allocations this big,
-            // and there's no way you'd want to put one in an
-            // inline bump heap anyway. it's easier if we put
-            // this check here. note that other parts of the code
-            // do depend on this check being in this method!
-            return ptr::null_mut();
         }
 
         let array = unsafe { &mut *self.array.get() };
@@ -185,7 +184,7 @@ impl<'a> BumpInto<'a> {
         };
 
         // round down to the nearest multiple of `align`
-        let aligned_ptr = (preferred_ptr / align) * align;
+        let aligned_ptr = preferred_ptr & !(align - 1);
 
         if aligned_ptr < array_start {
             // not enough space -- do nothing and return null
@@ -203,7 +202,7 @@ impl<'a> BumpInto<'a> {
     /// there was enough space; otherwise returns a null pointer.
     #[inline]
     pub fn alloc_space_for<T>(&self) -> *mut T {
-        self.alloc_space(SizeOf::<T>::new(), AlignOf::<T>::new()) as *mut T
+        self.alloc_space(layout_of::Single::<T>::new()) as *mut T
     }
 
     /// Tries to allocate enough space to store `count` number of `T`.
@@ -214,12 +213,7 @@ impl<'a> BumpInto<'a> {
             return NonNull::dangling().as_ptr();
         }
 
-        let size = mem::size_of::<T>().checked_mul(count);
-
-        match size {
-            Some(size) => self.alloc_space(size, AlignOf::<T>::new()) as *mut T,
-            None => ptr::null_mut(),
-        }
+        self.alloc_space(layout_of::Array::<T>::from_len(count)) as *mut T
     }
 
     /// Allocates space for as many aligned `T` as will fit in the
@@ -234,9 +228,9 @@ impl<'a> BumpInto<'a> {
             return (NonNull::dangling(), usize::MAX);
         }
 
-        let count = self.available_spaces(SizeOf::<T>::new(), AlignOf::<T>::new());
+        let count = self.available_spaces(layout_of::Single::<T>::new());
 
-        let pointer = self.alloc_space(count * mem::size_of::<T>(), AlignOf::<T>::new());
+        let pointer = self.alloc_space(layout_of::Array::<T>::from_len(count));
 
         match NonNull::new(pointer as *mut T) {
             Some(pointer) => (pointer, count),
@@ -337,7 +331,7 @@ impl<'a> BumpInto<'a> {
             }
         }
 
-        let pointer = self.alloc_space(mem::size_of_val(xs), AlignOf::<T>::new()) as *mut T;
+        let pointer = self.alloc_space(layout_of::Array::<T>::from_len(xs.len())) as *mut T;
 
         if pointer.is_null() {
             return None;
@@ -756,9 +750,11 @@ macro_rules! space_zeroed_aligned {
 mod tests {
     use crate::*;
 
+    use core::alloc::Layout;
+
     #[test]
     fn alloc() {
-        let mut space = space_uninit!(64);
+        let mut space = space_uninit!(128);
         let bump_into = BumpInto::from_slice(&mut space[..]);
 
         let something1 = bump_into.alloc(123u64).expect("allocation 1 failed");
@@ -799,11 +795,28 @@ mod tests {
         assert_eq!(*something3, 251222u64);
         assert_eq!(*something4, 289303u32);
         assert_eq!(*something6, 123523u32);
+
+        let something7 = bump_into.alloc_space(Layout::from_size_align(17, 8).unwrap());
+
+        assert!(!something7.is_null());
+        assert_eq!(something7 as usize & 7, 0);
+        assert!((something7 as usize).checked_add(17).unwrap() <= something6 as *mut _ as usize);
+
+        // for miri
+        unsafe {
+            ptr::write(something7 as *mut i64, -1);
+        }
+
+        assert_eq!(*something1, 123u64);
+        assert_eq!(*something2, 7775u16);
+        assert_eq!(*something3, 251222u64);
+        assert_eq!(*something4, 289303u32);
+        assert_eq!(*something6, 123523u32);
     }
 
     #[test]
     fn alloc_n() {
-        let mut space = space_uninit!(256);
+        let mut space = space_uninit!(1024);
         let bump_into = BumpInto::from_slice(&mut space[..]);
 
         let something1 = bump_into
@@ -836,7 +849,7 @@ mod tests {
         assert_eq!(something3, &[61921u16; 5]);
         assert_eq!(something4, &[71u64]);
 
-        if bump_into.alloc_n_with::<u64, _>(100, None).is_ok() {
+        if bump_into.alloc_n_with::<u64, _>(1000, None).is_ok() {
             panic!("allocation 5 succeeded");
         }
 
@@ -870,23 +883,41 @@ mod tests {
             something9,
             &[1u32, 258909, 1000, 1u32, 258909, 1000, 1, 2, 3, 1u32, 258909, 1000],
         );
+
+        // check that it fails on an array whose number of
+        // bytes would slightly overflow a usize.
+        if !bump_into
+            .alloc_space_for_n::<u32>(usize::MAX / 4 + 2)
+            .is_null()
+        {
+            panic!("allocation 10 succeeded");
+        }
     }
 
     #[test]
     fn available_bytes() {
+        const LAYOUT_U8: Layout = Layout::new::<u8>();
+
         let mut space = space_uninit!(32);
 
         {
             let mut bump_into = BumpInto::from_slice(&mut space[..]);
 
+            // check that we get zero for an array whose number of
+            // bytes would slightly overflow a usize.
+            assert_eq!(
+                bump_into.available_spaces(layout_of::Array::<u32>::from_len(usize::MAX / 4 + 2)),
+                0
+            );
+
             assert_eq!(bump_into.available_bytes(), 32);
-            assert_eq!(bump_into.available_spaces(1usize, 1usize), 32);
+            assert_eq!(bump_into.available_spaces(LAYOUT_U8), 32);
             assert_eq!(bump_into.available_spaces_for::<u8>(), 32);
 
             bump_into.alloc(0u8).expect("allocation 1 failed");
 
             assert_eq!(bump_into.available_bytes(), 31);
-            assert_eq!(bump_into.available_spaces(1usize, 1usize), 31);
+            assert_eq!(bump_into.available_spaces(LAYOUT_U8), 31);
             assert_eq!(bump_into.available_spaces_for::<u8>(), 31);
 
             let spaces_for_u32 = bump_into.available_spaces_for::<u32>();
@@ -895,11 +926,15 @@ mod tests {
 
             assert_eq!(bump_into.available_spaces_for::<u32>(), spaces_for_u32 - 1);
 
+            bump_into.alloc(0u8).expect("allocation 3 failed");
+
+            assert_eq!(bump_into.available_spaces_for::<u32>(), spaces_for_u32 - 2);
+
             {
                 let rest = bump_into.alloc_down_with(core::iter::repeat(0u32));
 
-                assert_eq!(rest.len(), spaces_for_u32 - 1);
-                assert!(rest.len() >= 6);
+                assert_eq!(rest.len(), spaces_for_u32 - 2);
+                assert!(rest.len() >= 5);
 
                 for &x in rest.iter() {
                     assert_eq!(x, 0u32);
@@ -914,10 +949,10 @@ mod tests {
             let bump_into = BumpInto::from_slice(&mut space[..]);
 
             assert_eq!(bump_into.available_bytes(), 32);
-            assert_eq!(bump_into.available_spaces(1usize, 1usize), 32);
+            assert_eq!(bump_into.available_spaces(LAYOUT_U8), 32);
             assert_eq!(bump_into.available_spaces_for::<u8>(), 32);
 
-            let something4 = bump_into.alloc(0u8).expect("allocation 4 failed");
+            let something4 = bump_into.alloc(0u8).expect("allocation 5 failed");
 
             assert_eq!(*something4, 0);
 
@@ -942,10 +977,10 @@ mod tests {
             let bump_into = BumpInto::from_slice(&mut space[..]);
 
             assert_eq!(bump_into.available_bytes(), 32);
-            assert_eq!(bump_into.available_spaces(1usize, 1usize), 32);
+            assert_eq!(bump_into.available_spaces(LAYOUT_U8), 32);
             assert_eq!(bump_into.available_spaces_for::<u8>(), 32);
 
-            let something6 = bump_into.alloc(0u8).expect("allocation 6 failed");
+            let something6 = bump_into.alloc(0u8).expect("allocation 7 failed");
 
             assert_eq!(*something6, 0);
 
@@ -969,7 +1004,7 @@ mod tests {
                 assert_eq!(*a, b + 1);
             }
 
-            bump_into.alloc(0u32).expect("allocation 8 failed");
+            bump_into.alloc(0u32).expect("allocation 9 failed");
 
             assert_eq!(bump_into.available_spaces_for::<u32>(), 0);
             assert!(bump_into.available_bytes() < 4);
@@ -1161,7 +1196,10 @@ mod tests {
         let bump_into = BumpInto::from_slice(space);
 
         assert_eq!(bump_into.available_bytes(), space_len);
-        assert_eq!(bump_into.available_spaces(0usize, 0x100usize), usize::MAX);
+        assert_eq!(
+            bump_into.available_spaces(Layout::from_size_align(0, 0x100).unwrap()),
+            usize::MAX
+        );
         assert_eq!(bump_into.available_spaces_for::<ZstWithDrop>(), usize::MAX);
 
         let (nothing1_ptr, nothing1_count) = bump_into.alloc_space_to_limit_for::<ZstWithDrop>();

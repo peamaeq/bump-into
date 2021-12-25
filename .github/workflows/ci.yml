@@ -47,14 +47,14 @@ jobs:
     - name: Run tests under Miri, big-endian
       run: cargo miri test --verbose --target mips64-unknown-linux-gnuabi64
   test-msrv:
-    name: rust 1.43 debug build & test
+    name: rust 1.44 debug build & test
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
-    - name: Install stable 1.43
+    - name: Install stable 1.44
       uses: actions-rs/toolchain@v1
       with:
-        toolchain: '1.43'
+        toolchain: '1.44'
         override: true
         profile: minimal
     - name: Build
