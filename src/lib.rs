@@ -354,13 +354,13 @@ impl<'a> BumpInto<'a> {
     /// let bytestring = b"Hello, World!";
     ///
     /// let null_terminated_bytestring = bump_into
-    ///     .alloc_copy_gather_slices(&[bytestring, &[0]])
+    ///     .alloc_copy_concat_slices(&[bytestring, &[0]])
     ///     .unwrap();
     ///
     /// assert_eq!(null_terminated_bytestring, b"Hello, World!\0");
     /// ```
     #[inline]
-    pub fn alloc_copy_gather_slices<T: Copy>(&self, xs_s: &[&[T]]) -> Option<&'a mut [T]> {
+    pub fn alloc_copy_concat_slices<T: Copy>(&self, xs_s: &[&[T]]) -> Option<&'a mut [T]> {
         let total_len = match xs_s
             .iter()
             .try_fold(0usize, |acc, xs| acc.checked_add(xs.len()))
@@ -856,19 +856,19 @@ mod tests {
         assert_eq!(something6, &[]);
 
         let something7 = bump_into
-            .alloc_copy_gather_slices(&[&[1u32, 258909, 1000]])
+            .alloc_copy_concat_slices(&[&[1u32, 258909, 1000]])
             .expect("allocation 7 failed");
 
         assert_eq!(something7, &[1u32, 258909, 1000]);
 
         let something8 = bump_into
-            .alloc_copy_gather_slices(&[&[1u32, 258909, 1000], &[9999], &[]])
+            .alloc_copy_concat_slices(&[&[1u32, 258909, 1000], &[9999], &[]])
             .expect("allocation 8 failed");
 
         assert_eq!(something8, &[1u32, 258909, 1000, 9999]);
 
         let something9 = bump_into
-            .alloc_copy_gather_slices(&[something7, something7, &[1, 2, 3], something7])
+            .alloc_copy_concat_slices(&[something7, something7, &[1, 2, 3], something7])
             .expect("allocation 9 failed");
 
         assert_eq!(
@@ -1229,30 +1229,30 @@ mod tests {
         assert_eq!(nothing7.len(), usize::MAX);
 
         let nothing8 = bump_into
-            .alloc_copy_gather_slices(&[&[(), ()], &[(), (), ()], &[]])
+            .alloc_copy_concat_slices(&[&[(), ()], &[(), (), ()], &[]])
             .expect("allocation 8 failed");
         assert_eq!(nothing8, &[(), (), (), (), ()]);
 
         let nothing9_array = [(); usize::MAX];
         let nothing9 = bump_into
-            .alloc_copy_gather_slices(&[&nothing9_array])
+            .alloc_copy_concat_slices(&[&nothing9_array])
             .expect("allocation 9 failed");
         assert_eq!(nothing9.len(), usize::MAX);
 
         let nothing10_array = [(); usize::MAX >> 4];
         let nothing10 = bump_into
-            .alloc_copy_gather_slices(&[&nothing10_array[..]; 16])
+            .alloc_copy_concat_slices(&[&nothing10_array[..]; 16])
             .expect("allocation 10 failed");
         assert_eq!(nothing10.len(), usize::MAX & !15);
 
         let nothing11_array = [(); usize::MAX];
-        let nothing11 = bump_into.alloc_copy_gather_slices(&[&nothing11_array, &[(); 1][..]]);
+        let nothing11 = bump_into.alloc_copy_concat_slices(&[&nothing11_array, &[(); 1][..]]);
         if nothing11.is_some() {
             panic!("allocation 11 succeeded");
         }
 
         let nothing12_array = [(); usize::MAX];
-        let nothing12 = bump_into.alloc_copy_gather_slices(&[&nothing12_array[..]; 2]);
+        let nothing12 = bump_into.alloc_copy_concat_slices(&[&nothing12_array[..]; 2]);
         if nothing12.is_some() {
             panic!("allocation 12 succeeded");
         }
