@@ -74,6 +74,47 @@ pub struct BumpInto<'a> {
     array: UnsafeCell<&'a mut [MaybeUninit<u8>]>,
 }
 
+/// This macro is used internally to implement
+/// `alloc_copy_concat_slices` and `alloc_copy_concat_strs`.
+macro_rules! alloc_copy_concat_impl {
+    ($self:ident, $xs_s:ident, [$t:ty] $(=> $from_slice:path)?, _ $($to_ptr:tt)*) => {{
+        let total_len = match $xs_s
+            .iter()
+            .try_fold(0usize, |acc, xs| acc.checked_add(xs.len()))
+        {
+            Some(total_len) => total_len,
+            None => return None,
+        };
+
+        if mem::size_of::<$t>() == 0 {
+            unsafe {
+                return Some($($from_slice)?(core::slice::from_raw_parts_mut(
+                    NonNull::dangling().as_ptr(),
+                    total_len,
+                )));
+            }
+        }
+
+        let pointer = $self.alloc_space_for_n::<$t>(total_len);
+
+        if pointer.is_null() {
+            return None;
+        }
+
+        unsafe {
+            let mut dest_pointer = pointer;
+
+            for &xs in $xs_s {
+                ptr::copy_nonoverlapping(xs $($to_ptr)*, dest_pointer, xs.len());
+
+                dest_pointer = dest_pointer.add(xs.len());
+            }
+
+            Some($($from_slice)?(core::slice::from_raw_parts_mut(pointer, total_len)))
+        }
+    }};
+}
+
 impl<'a> BumpInto<'a> {
     /// Creates a new `BumpInto`, wrapping a slice of `MaybeUninit<S>`.
     #[inline]
@@ -361,40 +402,35 @@ impl<'a> BumpInto<'a> {
     /// ```
     #[inline]
     pub fn alloc_copy_concat_slices<T: Copy>(&self, xs_s: &[&[T]]) -> Option<&'a mut [T]> {
-        let total_len = match xs_s
-            .iter()
-            .try_fold(0usize, |acc, xs| acc.checked_add(xs.len()))
-        {
-            Some(total_len) => total_len,
-            None => return None,
-        };
+        alloc_copy_concat_impl!(self, xs_s, [T], _ as *const [T] as *const T)
+    }
 
-        if mem::size_of::<T>() == 0 {
-            unsafe {
-                return Some(core::slice::from_raw_parts_mut(
-                    NonNull::dangling().as_ptr(),
-                    total_len,
-                ));
-            }
-        }
-
-        let pointer = self.alloc_space_for_n::<T>(total_len);
-
-        if pointer.is_null() {
-            return None;
-        }
-
-        unsafe {
-            let mut dest_pointer = pointer;
-
-            for &xs in xs_s {
-                ptr::copy_nonoverlapping(xs as *const [T] as *const T, dest_pointer, xs.len());
-
-                dest_pointer = dest_pointer.add(xs.len());
-            }
-
-            Some(core::slice::from_raw_parts_mut(pointer, total_len))
-        }
+    /// Tries to allocate enough space to store the concatenation of
+    /// the `str`s in `strs` and build said concatenation by copying
+    /// the contents of each `str` in order.
+    ///
+    /// On success (i.e. if there was enough space) produces a mutable
+    /// reference to the copy with the lifetime of this `BumpInto`'s
+    /// backing slice (`'a`).
+    ///
+    /// ## Example
+    ///
+    /// ```rust
+    /// use bump_into::{self, BumpInto};
+    ///
+    /// let mut space = bump_into::space_uninit!(16);
+    /// let bump_into = BumpInto::from_slice(&mut space[..]);
+    /// let string = "Hello, World!";
+    ///
+    /// let null_terminated_string = bump_into
+    ///     .alloc_copy_concat_strs(&[string, "\0"])
+    ///     .unwrap();
+    ///
+    /// assert_eq!(null_terminated_string, "Hello, World!\0");
+    /// ```
+    #[inline]
+    pub fn alloc_copy_concat_strs(&self, strs: &[&str]) -> Option<&'a mut str> {
+        alloc_copy_concat_impl!(self, strs, [u8] => core::str::from_utf8_unchecked_mut, _.as_ptr())
     }
 
     /// Tries to allocate enough space to store `count` number of `T` and
@@ -884,6 +920,39 @@ mod tests {
         {
             panic!("allocation 10 succeeded");
         }
+
+        // the behavior of `alloc_copy_concat_strs` should
+        // have nothing to do with the content of the strs,
+        // but let's test it with different character sets
+        // and a little bit of weird whitespace. because
+        // tests are for the future, and who can say what
+        // the future holds?
+
+        let something11 = bump_into
+            .alloc_copy_concat_strs(&["สวัสดี"])
+            .expect("allocation 11 failed");
+
+        assert_eq!(something11, "สวัสดี");
+
+        let something12 = bump_into
+            .alloc_copy_concat_strs(&["你好", "\\", ""])
+            .expect("allocation 12 failed");
+
+        assert_eq!(something12, "你好\\");
+
+        let something13 = bump_into
+            .alloc_copy_concat_strs(&[
+                something11,
+                something11,
+                "  \n (this parenthetical—is in English!)\r\n",
+                something11,
+            ])
+            .expect("allocation 13 failed");
+
+        assert_eq!(
+            something13,
+            "สวัสดีสวัสดี  \n (this parenthetical—is in English!)\r\nสวัสดี",
+        );
     }
 
     #[test]
