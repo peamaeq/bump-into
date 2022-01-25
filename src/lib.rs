@@ -955,6 +955,32 @@ mod tests {
         );
     }
 
+    #[cfg(target_pointer_width = "32")]
+    #[test]
+    fn alloc_copy_concat_strs_overflow() {
+        macro_rules! build_a_big_string {
+            (&$(,$amps:tt)*; $($strs:literal)+) => {
+                build_a_big_string!($($amps),*; $($strs)+ $($strs)+ $($strs)+ $($strs)+ $($strs)+ $($strs)+ $($strs)+ $($strs)+)
+            };
+
+            (; $($strs:literal)+) => {
+                concat!($($strs),+)
+            };
+        }
+
+        const THIRTY_TWO_MIB_STRING: &'static str = build_a_big_string!(&,&,&,&,&,&; "💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯");
+
+        let mut space = space_uninit!(1024);
+        let bump_into = BumpInto::from_slice(&mut space[..]);
+
+        if bump_into
+            .alloc_copy_concat_strs(&[THIRTY_TWO_MIB_STRING; 128])
+            .is_some()
+        {
+            panic!("allocation succeeded");
+        }
+    }
+
     #[test]
     fn available_bytes() {
         const LAYOUT_U8: Layout = Layout::new::<u8>();
