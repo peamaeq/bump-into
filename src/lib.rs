@@ -958,23 +958,20 @@ mod tests {
     #[cfg(target_pointer_width = "32")]
     #[test]
     fn alloc_copy_concat_strs_overflow() {
-        macro_rules! build_a_big_string {
-            (&$(,$amps:tt)*; $($strs:literal)+) => {
-                build_a_big_string!($($amps),*; $($strs)+ $($strs)+ $($strs)+ $($strs)+ $($strs)+ $($strs)+ $($strs)+ $($strs)+)
-            };
-
-            (; $($strs:literal)+) => {
-                concat!($($strs),+)
-            };
-        }
-
-        const THIRTY_TWO_MIB_STRING: &'static str = build_a_big_string!(&,&,&,&,&,&; "💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯💯");
+        const THIRTY_TWO_MIBS_OF_ZEROES: &'static [u8] = &[0; 1 << 25];
 
         let mut space = space_uninit!(1024);
         let bump_into = BumpInto::from_slice(&mut space[..]);
 
+        // SAFETY:
+        // 0 is a valid US-ASCII character, so a string
+        // of all 0 bytes is valid US-ASCII and therefore
+        // valid UTF-8 as well.
+        let thirty_two_mib_string =
+            unsafe { core::str::from_utf8_unchecked(THIRTY_TWO_MIBS_OF_ZEROES) };
+
         if bump_into
-            .alloc_copy_concat_strs(&[THIRTY_TWO_MIB_STRING; 128])
+            .alloc_copy_concat_strs(&[thirty_two_mib_string; 128])
             .is_some()
         {
             panic!("allocation succeeded");
