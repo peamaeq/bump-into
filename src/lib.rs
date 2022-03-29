@@ -46,9 +46,15 @@ assert_eq!(slice, &[10, 10, 100, 10, 10]);
 */
 
 #![no_std]
+#![cfg_attr(feature = "unstable_allocator_api", feature(allocator_api))]
+
+#[cfg(feature = "unstable_allocator_api")]
+extern crate alloc;
 
 pub mod layout_of;
 
+#[cfg(feature = "unstable_allocator_api")]
+use alloc::alloc::{AllocError, Allocator};
 use core::alloc::Layout;
 use core::cell::UnsafeCell;
 use core::fmt;
@@ -607,6 +613,46 @@ impl<'a> BumpInto<'a> {
         }
 
         alloc_down_with_shared_inner(self, iter, array_start, aligned_end)
+    }
+}
+
+#[cfg(feature = "unstable_allocator_api")]
+unsafe impl<'shared, 'a: 'shared> Allocator for &'shared BumpInto<'a> {
+    #[inline]
+    fn allocate(&self, layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
+        let ptr = self.alloc_space(layout) as *mut u8;
+        // we could include excess bytes, but they'd almost never
+        // be useful, since there are always fewer excess bytes than
+        // the alignment of the layout.
+        let slice_ptr = ptr::slice_from_raw_parts_mut(ptr, layout.size());
+
+        match NonNull::new(slice_ptr) {
+            Some(slice_ptr) => Ok(slice_ptr),
+            None => Err(AllocError),
+        }
+    }
+
+    // we could free the most recent allocation, or at least part
+    // of it, but that's too dicey to feel worth it. if you want
+    // to be able to free the most recent allocation from your
+    // bump heap, you should use a bump heap that keeps track of
+    // the sizes of previous allocations.
+    #[inline]
+    unsafe fn deallocate(&self, _ptr: NonNull<u8>, _layout: Layout) {}
+
+    // shrinking is implemented as a no-op, since the default
+    // implementation makes a fresh allocation and deallocates
+    // the old one, which is pointless waste on a bump heap.
+    #[inline]
+    unsafe fn shrink(
+        &self,
+        ptr: NonNull<u8>,
+        old_layout: Layout,
+        _new_layout: Layout,
+    ) -> Result<NonNull<[u8]>, AllocError> {
+        let slice_ptr = ptr::slice_from_raw_parts_mut(ptr.as_ptr(), old_layout.size());
+
+        Ok(NonNull::new_unchecked(slice_ptr))
     }
 }
 
@@ -1453,5 +1499,106 @@ mod tests {
         }));
         assert_eq!(nothing2.len(), usize::MAX);
         assert_eq!(iteration_count, usize::MAX as u128);
+    }
+
+    #[cfg(feature = "unstable_allocator_api")]
+    mod unstable_allocator_api {
+        use crate::*;
+
+        use alloc::boxed::Box;
+        use alloc::vec::Vec;
+        use core::cell::Cell;
+
+        struct NotifyDropped<'a>(&'a Cell<usize>);
+
+        impl<'a> Drop for NotifyDropped<'a> {
+            fn drop(&mut self) {
+                self.0.set(self.0.get() + 1);
+            }
+        }
+
+        #[test]
+        fn boxed() {
+            let mut space = space_uninit!(256);
+            let bump_into = BumpInto::from_slice(&mut space[..]);
+            let available_bytes_1 = bump_into.available_bytes();
+
+            let drop_count = Cell::new(0);
+
+            let available_bytes_2 = {
+                let _notify_dropped = Box::new_in(NotifyDropped(&drop_count), &bump_into);
+                assert_eq!(drop_count.get(), 0);
+                bump_into.available_bytes()
+            };
+
+            assert_eq!(drop_count.get(), 1);
+
+            let available_bytes_3 = bump_into.available_bytes();
+            assert_ne!(available_bytes_1, available_bytes_2);
+            assert_eq!(available_bytes_2, available_bytes_3);
+
+            let available_bytes_4;
+            let available_bytes_5;
+            {
+                let _notify_dropped_1 = Box::new_in(NotifyDropped(&drop_count), &bump_into);
+                available_bytes_4 = bump_into.available_bytes();
+                {
+                    let _notify_dropped_2 = Box::new_in(NotifyDropped(&drop_count), &bump_into);
+                    available_bytes_5 = bump_into.available_bytes();
+                    assert_eq!(drop_count.get(), 1);
+                }
+                assert_eq!(drop_count.get(), 2);
+            }
+
+            assert_eq!(drop_count.get(), 3);
+
+            let available_bytes_6 = bump_into.available_bytes();
+            assert_ne!(available_bytes_3, available_bytes_4);
+            assert_ne!(available_bytes_4, available_bytes_5);
+            assert_eq!(available_bytes_5, available_bytes_6);
+        }
+
+        #[test]
+        fn vec() {
+            let mut space = space_uninit!(256);
+            let bump_into = BumpInto::from_slice(&mut space[..]);
+            let available_bytes_1 = bump_into.available_bytes();
+
+            let drop_count = Cell::new(0);
+
+            let final_len;
+            let available_bytes_2;
+            let available_bytes_3;
+            {
+                let mut vec = Vec::with_capacity_in(4, &bump_into);
+                available_bytes_2 = bump_into.available_bytes();
+
+                for _ in 0..vec.capacity() {
+                    vec.push(NotifyDropped(&drop_count));
+                    assert_eq!(bump_into.available_bytes(), available_bytes_2);
+                }
+
+                assert!(vec.len() >= 4);
+
+                vec.push(NotifyDropped(&drop_count));
+                final_len = vec.len();
+                available_bytes_3 = bump_into.available_bytes();
+
+                vec.truncate(2);
+                assert_eq!(drop_count.get(), final_len - 2);
+                vec.shrink_to_fit();
+                assert_eq!(drop_count.get(), final_len - 2);
+                assert_eq!(bump_into.available_bytes(), available_bytes_3);
+            }
+
+            assert_eq!(drop_count.get(), final_len);
+
+            assert_ne!(available_bytes_1, available_bytes_2);
+            assert_ne!(available_bytes_2, available_bytes_3);
+            assert!(
+                available_bytes_2 - available_bytes_3
+                    >= core::mem::size_of::<NotifyDropped>() * final_len
+            );
+        }
     }
 }
