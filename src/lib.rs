@@ -55,9 +55,13 @@ pub mod layout_of;
 
 #[cfg(feature = "unstable_allocator_api")]
 use alloc::alloc::{AllocError, Allocator};
+#[cfg(feature = "unstable_allocator_api")]
+use alloc::boxed::Box;
 use core::alloc::Layout;
 use core::cell::UnsafeCell;
 use core::fmt;
+#[cfg(feature = "unstable_allocator_api")]
+use core::marker::PhantomData;
 use core::mem::{self, MaybeUninit};
 use core::ptr::{self, NonNull};
 
@@ -614,6 +618,68 @@ impl<'a> BumpInto<'a> {
 
         alloc_down_with_shared_inner(self, iter, array_start, aligned_end)
     }
+
+    #[cfg(feature = "unstable_allocator_api")]
+    #[inline]
+    pub fn boxed<T: 'a>(&self, x: T) -> Result<Box<T, NoopAlloc<'a>>, T> {
+        let mut_ref = self.alloc(x)?;
+
+        unsafe { Ok(Box::from_raw_in(mut_ref, NOOP_ALLOC)) }
+    }
+
+    #[cfg(feature = "unstable_allocator_api")]
+    #[inline]
+    pub fn boxed_with<T: 'a, F: FnOnce() -> T>(&self, f: F) -> Result<Box<T, NoopAlloc<'a>>, F> {
+        let mut_ref = self.alloc_with(f)?;
+
+        unsafe { Ok(Box::from_raw_in(mut_ref, NOOP_ALLOC)) }
+    }
+
+    #[cfg(feature = "unstable_allocator_api")]
+    #[inline]
+    pub fn boxed_uninit<T: 'a>(&self) -> Option<Box<MaybeUninit<T>, NoopAlloc<'a>>> {
+        let ptr = self.alloc_space_for::<MaybeUninit<T>>();
+
+        if ptr.is_null() {
+            None
+        } else {
+            unsafe { Some(Box::from_raw_in(ptr, NOOP_ALLOC)) }
+        }
+    }
+
+    #[cfg(feature = "unstable_allocator_api")]
+    #[inline]
+    pub fn boxed_n_with<T: 'a, I: IntoIterator<Item = T>>(
+        &self,
+        count: usize,
+        iter: I,
+    ) -> Result<Box<[T], NoopAlloc<'a>>, I> {
+        let mut_ref = self.alloc_n_with(count, iter)?;
+
+        unsafe { Ok(Box::from_raw_in(mut_ref, NOOP_ALLOC)) }
+    }
+
+    #[cfg(feature = "unstable_allocator_api")]
+    #[inline]
+    pub fn boxed_down_with<T: 'a, I: IntoIterator<Item = T>>(
+        &mut self,
+        iter: I,
+    ) -> Box<[T], NoopAlloc<'a>> {
+        let mut_ref = self.alloc_down_with(iter);
+
+        unsafe { Box::from_raw_in(mut_ref, NOOP_ALLOC) }
+    }
+
+    #[cfg(feature = "unstable_allocator_api")]
+    #[inline]
+    pub unsafe fn boxed_down_with_shared<T: 'a, I: IntoIterator<Item = T>>(
+        &self,
+        iter: I,
+    ) -> Box<[T], NoopAlloc<'a>> {
+        let mut_ref = self.alloc_down_with_shared(iter);
+
+        Box::from_raw_in(mut_ref, NOOP_ALLOC)
+    }
 }
 
 #[cfg(feature = "unstable_allocator_api")]
@@ -648,17 +714,78 @@ unsafe impl<'shared, 'a: 'shared> Allocator for &'shared BumpInto<'a> {
         &self,
         ptr: NonNull<u8>,
         old_layout: Layout,
-        _new_layout: Layout,
+        new_layout: Layout,
     ) -> Result<NonNull<[u8]>, AllocError> {
-        let slice_ptr = ptr::slice_from_raw_parts_mut(ptr.as_ptr(), old_layout.size());
-
-        Ok(NonNull::new_unchecked(slice_ptr))
+        NOOP_ALLOC.shrink(ptr, old_layout, new_layout)
     }
 }
 
 impl<'a> fmt::Debug for BumpInto<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "BumpInto {{ {} bytes free }}", self.available_bytes())
+    }
+}
+
+#[cfg(feature = "unstable_allocator_api")]
+#[derive(Debug, Copy, Clone)]
+pub struct NoopAlloc<'a> {
+    _phantom: PhantomData<&'a ()>,
+}
+
+#[cfg(feature = "unstable_allocator_api")]
+const NOOP_ALLOC: NoopAlloc<'static> = NoopAlloc {
+    _phantom: PhantomData,
+};
+
+#[cfg(feature = "unstable_allocator_api")]
+unsafe impl<'a> Allocator for NoopAlloc<'a> {
+    #[inline]
+    fn allocate(&self, _layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
+        Err(AllocError)
+    }
+
+    #[inline]
+    fn allocate_zeroed(&self, _layout: Layout) -> Result<NonNull<[u8]>, AllocError> {
+        Err(AllocError)
+    }
+
+    #[inline]
+    unsafe fn deallocate(&self, _ptr: NonNull<u8>, _layout: Layout) {}
+
+    #[inline]
+    unsafe fn grow(
+        &self,
+        _ptr: NonNull<u8>,
+        _old_layout: Layout,
+        _new_layout: Layout,
+    ) -> Result<NonNull<[u8]>, AllocError> {
+        Err(AllocError)
+    }
+
+    #[inline]
+    unsafe fn grow_zeroed(
+        &self,
+        _ptr: NonNull<u8>,
+        _old_layout: Layout,
+        _new_layout: Layout,
+    ) -> Result<NonNull<[u8]>, AllocError> {
+        Err(AllocError)
+    }
+
+    #[inline]
+    unsafe fn shrink(
+        &self,
+        ptr: NonNull<u8>,
+        old_layout: Layout,
+        new_layout: Layout,
+    ) -> Result<NonNull<[u8]>, AllocError> {
+        if new_layout.align() <= old_layout.align() {
+            let slice_ptr = ptr::slice_from_raw_parts_mut(ptr.as_ptr(), old_layout.size());
+
+            Ok(NonNull::new_unchecked(slice_ptr))
+        } else {
+            Err(AllocError)
+        }
     }
 }
 
@@ -1517,45 +1644,68 @@ mod tests {
             }
         }
 
-        #[test]
-        fn boxed() {
-            let mut space = space_uninit!(256);
-            let bump_into = BumpInto::from_slice(&mut space[..]);
-            let available_bytes_1 = bump_into.available_bytes();
+        macro_rules! boxed_x {
+            ($make_box:ident) => {
+                let mut space = space_uninit!(256);
+                let bump_into = BumpInto::from_slice(&mut space[..]);
+                let available_bytes_1 = bump_into.available_bytes();
 
-            let drop_count = Cell::new(0);
+                let drop_count = Cell::new(0);
 
-            let available_bytes_2 = {
-                let _notify_dropped = Box::new_in(NotifyDropped(&drop_count), &bump_into);
-                assert_eq!(drop_count.get(), 0);
-                bump_into.available_bytes()
-            };
+                let available_bytes_2 = {
+                    let _notify_dropped = $make_box!(NotifyDropped(&drop_count), bump_into);
+                    assert_eq!(drop_count.get(), 0);
+                    bump_into.available_bytes()
+                };
 
-            assert_eq!(drop_count.get(), 1);
+                assert_eq!(drop_count.get(), 1);
 
-            let available_bytes_3 = bump_into.available_bytes();
-            assert_ne!(available_bytes_1, available_bytes_2);
-            assert_eq!(available_bytes_2, available_bytes_3);
+                let available_bytes_3 = bump_into.available_bytes();
+                assert_ne!(available_bytes_1, available_bytes_2);
+                assert_eq!(available_bytes_2, available_bytes_3);
 
-            let available_bytes_4;
-            let available_bytes_5;
-            {
-                let _notify_dropped_1 = Box::new_in(NotifyDropped(&drop_count), &bump_into);
-                available_bytes_4 = bump_into.available_bytes();
+                let available_bytes_4;
+                let available_bytes_5;
                 {
-                    let _notify_dropped_2 = Box::new_in(NotifyDropped(&drop_count), &bump_into);
-                    available_bytes_5 = bump_into.available_bytes();
-                    assert_eq!(drop_count.get(), 1);
+                    let _notify_dropped_1 = $make_box!(NotifyDropped(&drop_count), bump_into);
+                    available_bytes_4 = bump_into.available_bytes();
+                    {
+                        let _notify_dropped_2 = $make_box!(NotifyDropped(&drop_count), bump_into);
+                        available_bytes_5 = bump_into.available_bytes();
+                        assert_eq!(drop_count.get(), 1);
+                    }
+                    assert_eq!(drop_count.get(), 2);
                 }
-                assert_eq!(drop_count.get(), 2);
+
+                assert_eq!(drop_count.get(), 3);
+
+                let available_bytes_6 = bump_into.available_bytes();
+                assert_ne!(available_bytes_3, available_bytes_4);
+                assert_ne!(available_bytes_4, available_bytes_5);
+                assert_eq!(available_bytes_5, available_bytes_6);
+            };
+        }
+
+        #[test]
+        fn boxed_std() {
+            macro_rules! make_box {
+                ($x:expr, $bump_into:expr) => {
+                    Box::new_in($x, &$bump_into)
+                };
             }
 
-            assert_eq!(drop_count.get(), 3);
+            boxed_x!(make_box);
+        }
 
-            let available_bytes_6 = bump_into.available_bytes();
-            assert_ne!(available_bytes_3, available_bytes_4);
-            assert_ne!(available_bytes_4, available_bytes_5);
-            assert_eq!(available_bytes_5, available_bytes_6);
+        #[test]
+        fn boxed_self() {
+            macro_rules! make_box {
+                ($x:expr, $bump_into:expr) => {
+                    $bump_into.boxed($x)
+                };
+            }
+
+            boxed_x!(make_box);
         }
 
         #[test]
