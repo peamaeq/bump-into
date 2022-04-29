@@ -100,9 +100,9 @@ macro_rules! alloc_copy_concat_impl {
         if pointer.is_null() {
             return None;
         }
-
+        let mut dest_pointer = pointer;
         unsafe {
-            let mut dest_pointer = pointer;
+            
 
             for &xs in $xs_s {
                 ptr::copy_nonoverlapping(xs $($to_ptr)*, dest_pointer, xs.len());
